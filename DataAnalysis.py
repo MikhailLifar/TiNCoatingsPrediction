@@ -27,27 +27,40 @@ from TiN_frame_process import *
 from TiN_plots import *
 
 
-def model_create_frame_fit(frame, target_columns, used_columns, create_method='RidgeCV', file_name='ResultModeling.xlsx',
+def model_create(model_str: str):
+    """
+    The function receives model name
+    and returns two objects: regressor object, classifier object
+
+    :param model_str:
+    :return:
+    """
+    if model_str == 'RidgeCV':
+        model = RidgeCV(alphas=(0.001, 0.01, 0.1, 1, 10, 100))
+        model_classifier = LogisticRegression()
+    elif model_str == 'ExtraTR':
+        model = ExtraTreesRegressor(random_state=0)
+        model_classifier = ExtraTreesClassifier(random_state=0)
+    elif model_str == 'Gauss':
+        kernel = C(1.0) * RBF(1.0)
+        model = GaussianProcessRegressor(kernel=kernel)
+        model_classifier = GaussianProcessClassifier(kernel=kernel, n_restarts_optimizer=10, random_state=0)
+    elif model_str == 'SVM':
+        model = SVR(kernel='rbf', C=10, epsilon=0.1)
+        model_classifier = SVC(kernel='rbf', C=10)
+    else:
+        assert False, f'invalid value for create_method: {model_str}'
+    return model, model_classifier
+
+
+def model_create_frame_fit(frame, target_columns, used_columns, model_str='RidgeCV', folder='',
                            data_set='original', crossval_mode='LOO arts', mod='r2score', draw_picture=False, count_importance=False, **key_args):
     if not isinstance(target_columns, list):
         target_columns = list(target_columns)
     if not isinstance(used_columns, list):
         used_columns = list(used_columns)
     num_expr = frame.shape[0]
-    if create_method == 'RidgeCV':
-        model = RidgeCV(alphas=(0.001, 0.01, 0.1, 1, 10, 100))
-        model_classifier = LogisticRegression()
-    elif create_method == 'ExtraTR':
-        model = ExtraTreesRegressor(random_state=0)
-        model_classifier = ExtraTreesClassifier(random_state=0)
-    elif create_method == 'Gauss':
-        kernel = C(1.0) * RBF(1.0)
-        model = GaussianProcessRegressor(kernel=kernel)
-        model_classifier = GaussianProcessClassifier(kernel=kernel, n_restarts_optimizer=10, random_state=0)
-    elif create_method == 'SVM':
-        model = SVR(kernel='rbf', C=10, epsilon=0.1)
-    else:
-        assert False, f'invalid value for create_method: {create_method}'
+    model, model_classifier = model_create(model_str)
     dict_r2 = dict()
     if mod == 'all':
         output = pd.DataFrame()
@@ -78,8 +91,8 @@ def model_create_frame_fit(frame, target_columns, used_columns, create_method='R
                 arr = model_name.predict(frame.loc[inds[i], used_columns].to_numpy().reshape(1, -1))
                 assert arr.size == 1
                 values[inds[i]] = arr[0]
-                if create_method == 'RidgeCV':
-                    print(model.alpha_)
+                # if model_str == 'RidgeCV':
+                #     print(model.alpha_)
         elif crossval_mode == crossval_mode[0] + ':1':
             assert crossval_mode[0] in '3456789', f'invalid value for crossval_mode: {crossval_mode}'
             cv = int(crossval_mode[0])
@@ -112,8 +125,8 @@ def model_create_frame_fit(frame, target_columns, used_columns, create_method='R
                 if (ind_notnull.size > 0) and (len(descr_inds_art) > 0):
                     model_descr.fit(frame.loc[ind_notnull, used_columns], frame.loc[ind_notnull, name])
                     values[descr_inds_art] = model_descr.predict(art.loc[descr_inds_art, used_columns])
-                    if create_method == 'RidgeCV':
-                        print(model.alpha_)
+                    # if model_str == 'RidgeCV':
+                    #     print(model.alpha_)
                 elif ind_notnull.size == 0:
                     count_score = False
         else:
@@ -145,22 +158,21 @@ def model_create_frame_fit(frame, target_columns, used_columns, create_method='R
             ax.plot([-10, 100], [-10, 100], c='red')
             ax.set_xlabel(f'{name}_predicted')
             ax.set_ylabel(f'{name}_original')
-            out_folder_picture = key_args['out_folder_picture']
-            fig.savefig(f'{out_folder_picture}{name}_prediction_picture_{create_method}.png')
+            fig.savefig(f'{folder}{name}_prediction_picture_{model_str}.png')
             plt.close(fig)
-        if create_method == 'ExtraTR' and count_importance:
+        if model_str == 'ExtraTR' and count_importance:
             importance_data = np.empty(len(used_columns), dtype=[('feature_name', 'U20'), ('importance', float)])
             for i in range(len(used_columns)):
                 importance_data[i] = used_columns[i], model_name.feature_importances_[i]
             importance_data.sort(order='importance')
             try:
-                df = pd.read_excel('importance_data.xlsx')
+                df = pd.read_excel(f'{folder}importance_data.xlsx')
                 del df['Unnamed: 0']
             except FileNotFoundError:
                 df = pd.DataFrame()
             df['feature_' + key_args["imp_name"]] = importance_data['feature_name']
             df['importance_' + key_args["imp_name"]] = importance_data['importance']
-            df.to_excel('importance_data.xlsx')
+            df.to_excel(f'{folder}importance_data.xlsx')
             # fig, ax = plt.subplots(1, figsize=MAIN_FIG_SIZE)
             # ax.tick_params(labelsize=8)
             # ax.barh(importance_data['feature_name'], importance_data['importance'],
@@ -175,16 +187,31 @@ def model_create_frame_fit(frame, target_columns, used_columns, create_method='R
         for name in target_columns:
             output.loc[-1, name + '_predict'] = dict_r2[name]
         output.sort_index(inplace=True)
-        output.to_excel(file_name, index=False)
+        output.to_excel(f'{folder}ResultModeling.xlsx', index=False)
     elif mod == 'r2score':
         return dict_r2
 
 
 def get_result(dataframe, target_columns, used_columns, folder='', **keyargs):
+
+    """
+
+    Each column from target columns is predicted
+    using used columns
+
+    :param dataframe:
+    :param target_columns:
+    :param used_columns:
+    :param folder:
+    :param keyargs:
+    :return:
+    """
+
     # imp_mass = ['simple', 'iterative', 'knn', 'soft_imp', 'const', 'matr_factoriz', 'similarity']
     imp_mass = ['const', 'simple', 'iterative', 'knn']
     # model_mass = ['ExtraTR', 'RidgeCV', 'Gauss', 'SVM']
-    model_mass = ['ExtraTR', 'RidgeCV', 'SVM']
+    model_mass = ['ExtraTR', 'SVM', 'RidgeCV']
+    # model_mass = ['ExtraTR']
     res = pd.DataFrame()
     frame_imps_mass = []
     for name in imp_mass:
@@ -200,10 +227,11 @@ def get_result(dataframe, target_columns, used_columns, folder='', **keyargs):
         recove_frame = recovery_data(dataframe, used_columns, recovery_method=imp, fill_value=keyargs['fill_value'])
         # print(recove_frame.dtypes)
         for model in model_mass:
-            dict_res_model = model_create_frame_fit(recove_frame, target_columns, used_columns, create_method=model,
+            dict_res_model = model_create_frame_fit(recove_frame, target_columns, used_columns, model_str=model,
                                                     crossval_mode=keyargs['crossval_mode'], articles=keyargs['articles'],
                                                     draw_picture=keyargs['draw_picture'],
                                                     count_importance=keyargs['count_importance'], imp_name=imp,
+                                                    folder=folder,
                                                     out_folder_picture='Scatters/Scatters_predict/table3/')
             for name in dict_res_model:
                 dict_res[name][j] = dict_res_model[name]
@@ -215,6 +243,20 @@ def get_result(dataframe, target_columns, used_columns, folder='', **keyargs):
 
 
 def get_result_one_target_per_all_others(dataframe, target_columns, used_columns, folder='', **keyargs):
+
+    """
+
+    Each column from target columns column is predicted using
+    used_columns and other target columns
+
+    :param dataframe:
+    :param target_columns:
+    :param used_columns:
+    :param folder:
+    :param keyargs:
+    :return:
+    """
+
     # imp_mass = ['simple', 'iterative', 'knn', 'soft_imp', 'const', 'matr_factoriz', 'similarity']
     imp_mass = ['const', 'simple', 'iterative', 'knn']
     # model_mass = ['ExtraTR', 'RidgeCV', 'Gauss', 'SVM']
@@ -240,7 +282,7 @@ def get_result_one_target_per_all_others(dataframe, target_columns, used_columns
                     recove_frame,
                     [name],
                     used_columns + target_columns[:i] + target_columns[i+1:],
-                    create_method=model,
+                    model_str=model,
                     crossval_mode=keyargs['crossval_mode'], articles=keyargs['articles'],
                     draw_picture=keyargs['draw_picture'],
                     count_importance=keyargs['count_importance'], imp_name=imp,
@@ -383,15 +425,14 @@ def descr_analysis(frame, columns, number_of_tests=20, model_name='ExtraTR', imp
             target_values.astype('int32')
             cross_val_arr = skl.model_selection.cross_val_score(model_classifier, recove_frame.loc[dict_ind[name], columns[columns != name]], target_values, cv=min(10, len(dict_ind[name])))
             # print(cross_val_arr)
-            origin_variance = 1 - np.mean(cross_val_arr)
-            graph_data.loc[i_1, 'r2_arr'] = np.mean(cross_val_arr)
+            origin_r2 = np.mean(cross_val_arr)  # R2 value
+            graph_data.loc[i_1, 'r2_arr'] = origin_r2
         else:
             origin_arr = recove_frame.loc[dict_ind[name], name]
             cross_val_arr = skl.model_selection.cross_val_predict(model, recove_frame.loc[dict_ind[name], columns[columns != name]], recove_frame.loc[dict_ind[name], name], cv=min(10, len(dict_ind[name])))
-            origin_variance = np.mean((origin_arr - cross_val_arr)**2)
-            v = np.mean((origin_arr - np.mean(origin_arr))**2)
-            graph_data.loc[i_1, 'r2_arr'] = 1 - origin_variance / v
-        random_variances = np.empty(number_of_tests)
+            origin_r2 = scoreFast(origin_arr, cross_val_arr)  # R2 value
+            graph_data.loc[i_1, 'r2_arr'] = origin_r2
+        random_r2 = np.empty(number_of_tests)
         for i in range(number_of_tests):
             if name in nominal_descr:
                 vals, prob = np.unique(recove_frame.loc[dict_ind[name], name], return_counts=True)
@@ -403,21 +444,22 @@ def descr_analysis(frame, columns, number_of_tests=20, model_name='ExtraTR', imp
                 random_values = np.array([vals[np.where(ind[k])[0][0]] for k in range(sz)])
                 cross_val_arr = skl.model_selection.cross_val_score(model_classifier, recove_frame.loc[dict_ind[name],
                                             columns[columns != name]], random_values, cv=min(10, len(dict_ind[name])))
-                random_variances[i] = 1-np.mean(cross_val_arr)
+                random_r2 = np.mean(cross_val_arr)
             else:
                 random_values = get_random_values(recove_frame.loc[dict_ind[name], name], distribution='shuffle_origin')
                 cross_val_arr = skl.model_selection.cross_val_predict(model, recove_frame.loc[dict_ind[name], columns[columns != name]], random_values, cv=min(10, len(dict_ind[name])))
-                random_variances[i] = np.mean((random_values - cross_val_arr)**2)
-        print(name, np.sum(origin_variance < random_variances) / number_of_tests)
-        print(origin_variance, random_variances)
-        graph_data.loc[i_1, 'statistic'] = np.sum(origin_variance < random_variances) / number_of_tests
+                random_r2[i] = scoreFast(random_values, cross_val_arr)
+        print(name, np.sum(origin_r2 > random_r2) / number_of_tests)
+        print(origin_r2, random_r2)
+        graph_data.loc[i_1, 'statistic'] = np.sum(origin_r2 > random_r2) / number_of_tests
         i_1 += 1
     graph_data.to_excel('descr_analysis.xlsx')
 
 
-def get_quality_1_2_3_4(frame, used_cols, target_descr, flags=(1, 1, 1, 0, 0), cv_parts=5, out_folder='', **kwargs):
+def get_quality_1_2_3_4(frame, used_cols, target_descr, model_name, flags=(1, 1, 1, 0, 0), cv_parts=5, out_folder='', **kwargs):
     assert isinstance(target_descr, str), 'parameter descr should be string'
     assert kwargs['recovery_method'] != 'iterative', 'only not iterative for this function'
+    model_regr, model_class = model_create(model_name)
     features = used_cols
     try:
         features.remove(target_descr)
@@ -427,7 +469,7 @@ def get_quality_1_2_3_4(frame, used_cols, target_descr, flags=(1, 1, 1, 0, 0), c
         if flags[i - 1]:
             descriptor.descriptor_quality(recovery_data(frame.loc[dict_ind[target_descr], :],
                                                         used_cols, recovery_method=kwargs['recovery_method'], fill_value=kwargs['fill_value']),
-                                          [target_descr], features, model_regr=kwargs['model_regr'], model_class=kwargs['model_class'],
+                                          [target_descr], features, model_regr=model_regr, model_class=model_class,
                                           feature_subset_size=i, cv_repeat=10, cv_parts_count=cv_parts,
                                           folder=f'{out_folder}quality_{i}', shuffle=True)
             print('all right')
@@ -500,20 +542,20 @@ def get_frame_of_ratios(frame, articles, num_rows_per_art=10, mode='ratio'):
     return out
 
 
-def qheatmap_data(frame, descr, features, model='ExtraTR', recovering='const'):
+def qheatmap_data(frame, folder, descr, features, model='ExtraTR', recovering='const'):
     recove_frame = recovery_data(frame, features, recovery_method=recovering, fill_value=FILL_VALUE)
-    true_values = frame.loc[dict_ind[descr], descr]
-    v = np.mean((true_values - np.mean(true_values)) ** 2)
+    # true_values = frame.loc[dict_ind[descr], descr]
+    # v = np.mean((true_values - np.mean(true_values)) ** 2)
     matrix_r2 = np.zeros((features.size, features.size))
     for i in range(features.size):
         for j in range(i, features.size):
             f1 = features[i]
             f2 = features[j]
             if f1 == f2:
-                dict_value = model_create_frame_fit(recove_frame, [descr], [f1], create_method=model,
+                dict_value = model_create_frame_fit(recove_frame, [descr], [f1], model_str=model,
                                                     crossval_mode='3:1', imp_name='')
             else:
-                dict_value = model_create_frame_fit(recove_frame, [descr], [f1, f2], create_method=model,
+                dict_value = model_create_frame_fit(recove_frame, [descr], [f1, f2], model_str=model,
                                                     crossval_mode='3:1', imp_name='')
             matrix_r2[i][j] = dict_value[descr]
             if f1 != f2:
@@ -521,7 +563,7 @@ def qheatmap_data(frame, descr, features, model='ExtraTR', recovering='const'):
     df = pd.DataFrame()
     for ind, name in enumerate(features):
         df[name] = matrix_r2[ind]
-    df.to_excel('qheatmap_data.xlsx')
+    df.to_excel(f'{folder}qheatmap_data.xlsx')
 
 
 # def data_analysis(frame):
@@ -556,8 +598,8 @@ dict_last_cols['_Guda_3'] = 'JZ'
 dict_num_exps['_Guda_3'] = 281
 
 input_folder_prefix = ''
-folder_prefix = 'result/Predict_ExtraTR/'
 input_postfix = '_Guda_3'
+folder_prefix = 'result/Predict_ExtraTR/'
 postfix = '.from1to3'
 
 file_input_data = f'{input_folder_prefix}DataTable{input_postfix}.xlsx'
@@ -592,7 +634,7 @@ good_exp = np.arange(x.shape[0])[x['Bad'].isna()]
 
 # arts_descrs_picture(x, hist_or_bar='bar')
 
-x = get_filtered_frame(x, delete_cols=True, delete_rows=True, good_names=good_descrs, good_rows=good_exp)
+# x = get_filtered_frame(x, delete_names=True, delete_exps=True, good_names=good_descrs, good_rows=good_exp)
 x.reset_index(drop=True, inplace=True)
 
 arts, inds = np.unique(x['PaperID'], return_index=True)
@@ -640,15 +682,15 @@ delete_empty_descriptors(x, names)
 
 # count_sparsity(x.loc[:, remove_many(x.columns, ['PaperID', 'Bad'])], create_bar=True)
 #
-# get_descr_picture(x, x.columns, all_table=True)
+get_descr_picture(x, x.columns, all_table=True, out_folder='22_04_results')
 
 # x.to_excel('x_file.xlsx')
 
 # all_plots('new_res_27_12_21/')
-# exit(0)
+exit(0)
 
 # for name in x.columns:
-#     get_descr_distribution_picture(x, name, folder_to_put_file='DescrsDistribution/DescrsDistribution_table3/')
+#     get_descr_distribution_picture(x, name, out_folder='22_04_results/descrs_distribution/')
 # exit(0)
 
 # for d in exp_descr:
@@ -663,7 +705,9 @@ get_normal(x, norm_nominal=True)
 
 # print(dict_labels)
 
-# qheatmap_data(x, 'H', np.array(best_features), model='ExtraTR', recovering='const')
+# qheatmap_data(x, descr='H', features=np.array(best_features),
+#               folder='NoFilterTry_22_04_14/',
+#               model='ExtraTR', recovering='const')
 # quality_heatmap('qheatmap_data.xlsx')
 
 # x.loc[:, clean_list(x, nominal_descr, inplace=False)].to_excel('x_file_3.xlsx')
@@ -680,7 +724,7 @@ get_normal(x, norm_nominal=True)
 # mech_descr.append('rH')
 # dict_ind['rH'] = copy.deepcopy(dict_ind['H'])
 
-# get_quality_1_2_3_4(x, exp_descr, 'H', flags=(1, 1, 1, 1, 0), cv_parts=4, out_folder='Result_for_article_10_2021/Quality_18_10/', model_regr=SVR(C=10, epsilon=0.1), model_class=SVC(), recovery_method='const', fill_value=FILL_VALUE)
+# get_quality_1_2_3_4(x, exp_descr, 'H', model_name='ExtraTR', flags=(1, 1, 1, 1, 0), cv_parts=4, out_folder='NoFilterTry_22_04_14/', recovery_method='const', fill_value=FILL_VALUE)
 
 # current_cols = remove_many(x.columns, ['PaperID', 'Bad', 'CheckSum_N2Press_SubT', 'CheckSum_DeposRate_VoltBias'])
 # descr_analysis(x, current_cols)
@@ -700,12 +744,18 @@ score_mode = 'relative'
 
 # x = recovery_data(x, exp_descr, recovery_method='const', fill_value=FILL_VALUE)
 # bar_descrs = ['H', 'E', 'CoatMu', 'CritLoad']
-# bar_descrs = ['H']
-# get_result(x, remove_many(exp_descr, nominal_descr), ['H'], fill_value=FILL_VALUE, crossval_mode='3:1', count_importance=False, folder='InverseProblem_12_01_22/', articles=articles_names, draw_picture=False)
-get_result_one_target_per_all_others(x, remove_many(exp_descr, nominal_descr), ['H'], fill_value=FILL_VALUE, crossval_mode='3:1', count_importance=False, folder='InverseProblem_12_01_22/', articles=articles_names, draw_picture=False)
+bar_descrs = ['H']
+get_result(x, ['H'], exp_descr, fill_value=FILL_VALUE, crossval_mode='3:1', count_importance=True, folder='22_04_results/unfiltered/', articles=articles_names, draw_picture=True)
 # get_result(x, mech_descr, exp_descr, fill_value=FILL_VALUE, crossval_mode='3:1', folder='InverseProblem_12_01_22/', articles=articles_names, draw_picture=False)
-# bar_for_get_result('ResultTable.xlsx', bar_descrs=clean_list(x, bar_descrs, inplace=False))
-# importance_bars('importance_data.xlsx', 'H')
+
+# %INVERSE PROBLEM
+# get_result(x, remove_many(exp_descr, nominal_descr), ['H'], fill_value=FILL_VALUE, crossval_mode='3:1', count_importance=False, folder='InverseProblem_12_01_22/', articles=articles_names, draw_picture=False)
+# get_result_one_target_per_all_others(x, remove_many(exp_descr, nominal_descr), ['H'], fill_value=FILL_VALUE, crossval_mode='3:1', count_importance=False, folder='InverseProblem_12_01_22/', articles=articles_names, draw_picture=False)
+
+# add_text={'s': 'filtered frame', 'x': 0.0, 'y': 0.9}
+bar_for_get_result('22_04_results/unfiltered/ModelingResults.xlsx', bar_descrs=clean_list(x, bar_descrs, inplace=False),
+                   add_text='for unfiltered data')
+# importance_bars('22_04_results/unfiltered/', 'H')
 
 # model_create_frame_fit(recovery_data(x, exp_descr, recovery_method='knn', fill_value=FILL_VALUE), mech_descr, exp_descr, create_method='ExtraTR', crossval_mode='3:1', mod='all', draw_picture=False, out_folder_picture='Scatters/Scatters_predict/table3/')
 

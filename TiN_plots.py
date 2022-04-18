@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import \
+    numpy as np
 import seaborn as sns
 
 from usable_functions_1 import *
@@ -27,21 +29,21 @@ def count_sparsity(frame, create_bar=False, out_folder='', out_file='sparsity_pi
                color=color_arr_from_arr(1 - descrs_sparsity, init_color=(1, 0.9, 0.9), finish_color=(1, 0.2, 0.2), bottom=0., up=1.))
         fig.savefig(out_folder + out_file, dpi=MAIN_DPI, bbox_inches='tight')
         plt.close(fig)
-    else:
-        print('Sparsity of all data:\n', np.sum(missing_mask) / missing_mask.size)
-        print('Sparsity per each descr:\n', descrs_sparsity)
-        print('Sparsity per each descr, max:\n', np.max(descrs_sparsity))
-        print('Sparsity per each descr, min:\n', np.min(descrs_sparsity))
-        print('Sparsity per each descr, median:\n', np.median(descrs_sparsity))
-        print('Sparsity per each exp:\n', exps_sparsity)
-        print('Sparsity per each exp, max:\n', np.max(exps_sparsity))
-        print('Sparsity per each exp, min:\n', np.min(exps_sparsity))
-        print('Sparsity per each exp, median:\n', np.median(exps_sparsity))
+
+    print('Sparsity of all data:\n', np.sum(missing_mask) / missing_mask.size)
+    print('Sparsity per each descr:\n', descrs_sparsity)
+    print('Sparsity per each descr, max:\n', np.max(descrs_sparsity))
+    print('Sparsity per each descr, min:\n', np.min(descrs_sparsity))
+    print('Sparsity per each descr, median:\n', np.median(descrs_sparsity))
+    print('Sparsity per each exp:\n', exps_sparsity)
+    print('Sparsity per each exp, max:\n', np.max(exps_sparsity))
+    print('Sparsity per each exp, min:\n', np.min(exps_sparsity))
+    print('Sparsity per each exp, median:\n', np.median(exps_sparsity))
 
 
-def bar_for_get_result(folder, bar_descrs):
+def bar_for_get_result(filepath, bar_descrs, out_file_name=None, add_text=None):
     # read and check
-    r2_data = pd.read_excel(folder + 'ResultTable.xlsx')
+    r2_data = pd.read_excel(filepath)
     # r2_data.to_excel('bar_check.xlsx')
     # imputers
     imp_arr = np.array(r2_data.loc[0, 0:])
@@ -85,17 +87,22 @@ def bar_for_get_result(folder, bar_descrs):
             ax.bar(x_data[num_models * np.arange(num_imps) + i1], r2_values[num_models * np.arange(num_imps) + i1], width=width, label=model, color=colors[i1])
         # rects_list.append(rects)
         # sgn *= -1
+        # if add_text_plot is not None:
+        #     ax.text(**add_text_plot, fontsize=MAIN_PLOT_FONT_SIZE)
         ax.set_ylabel('R2 score', fontsize=MAIN_PLOT_FONT_SIZE)
-        ax.set_title('R2 scores\nby imputer and model', fontsize=MAIN_PLOT_FONT_SIZE)
+        ax.set_title(f'R2 scores\n{add_text}', fontsize=MAIN_PLOT_FONT_SIZE)
         ax.set_xticks(x_data)
         ax.set_xticklabels(labels)
         ax.tick_params(labelsize=BIG_LABELSIZE)
         ax.legend()
-        fig.savefig(f'{folder}score_bars_{descr}.png', dpi=MAIN_DPI, bbox_inches='tight')
+        if out_file_name is None:
+            out_file_name = f'score_bars_{descr}'
+        fig.savefig(f'{filepath[:filepath.rfind("/") + 1]}{out_file_name}.png', dpi=MAIN_DPI, bbox_inches='tight')
         plt.close(fig)
 
 
 def importance_bars(folder, name):
+    # TODO: this function really depends on external effects, fix it
     importance_data = pd.read_excel(folder + 'importance_data.xlsx')
     flag = False
     for col in importance_data.columns:
@@ -140,34 +147,35 @@ def bars_for_descr_analysis(folder=''):
     plt.close(fig)
 
 
-def get_descr_distribution_picture(frame, descr, folder_to_put_file='', bins=50):
+def get_descr_distribution_picture(frame, descr, out_folder='', bins=50, color='#ffba54'):
     fig, ax = plt.subplots(figsize=MAIN_FIG_SIZE)
     data = np.array(frame.loc[dict_ind[descr], descr])
-    p = ax.hist(data, bins=bins)
-    plt.xlabel(f'Value of {descr}')
-    plt.ylabel('Count')
-    c = ax.set_title(f'{descr} distribution')
+    total_values = data[data is not np.nan].size
+    ax.hist(data, bins=bins, color=color, histtype='bar')
+    ax.set_xlabel(f'Value of {descr}', fontsize=MAIN_PLOT_FONT_SIZE)
+    ax.set_ylabel('Count', fontsize=MAIN_PLOT_FONT_SIZE)
+    ax.set_title(f'{descr} distribution\ntotal number of values: {total_values}', fontsize=MAIN_PLOT_FONT_SIZE)
     # ax.yaxis.set_major_formatter(PercentFormatter(xmax=1))
-    fig.savefig(f'{folder_to_put_file}{descr}.png', dpi=MAIN_DPI, bbox_inches='tight')
+    fig.savefig(f'{out_folder}{descr}.png', dpi=MAIN_DPI, bbox_inches='tight')
     plt.close(fig)
 
 
-def get_descr_picture(dataframe, columns, descr='', all_table=False, out_folder=''):
+def get_descr_picture(df, columns, descr='', all_table=False, out_folder=''):
     if all_table:
-        matr = dataframe.T.isna().astype('int64').to_numpy()
+        matr = df.T.isna().astype('int64').to_numpy()
         title = 'График разреженности\nбазы данных'
     else:
         assert len(descr), 'expect descriptor`s name, received nothing'
-        matr = dataframe.loc[dict_ind[descr], columns].T.isna().astype('int64').to_numpy()
+        matr = df.loc[dict_ind[descr], columns].T.isna().astype('int64').to_numpy()
         title = f'График, наглядно демонстрирующий разреженность матрицы данных составленной из столбцов в которых {descr} notNull'
     f, ax = plt.subplots(figsize=MAIN_FIG_SIZE)
     ax.tick_params(labelsize=BIG_LABELSIZE)
     ax = sns.heatmap(matr, linewidths=0.1, xticklabels=False, yticklabels=columns, ax=ax, cbar=False, cmap=['blue', 'white'])
-    с = ax.set_title(title, fontsize=MAIN_PLOT_FONT_SIZE)
+    ax.set_title(title, fontsize=MAIN_PLOT_FONT_SIZE)
     if all_table:
-        f.savefig(f'{out_folder}all_table_picture.png', dpi=MAIN_DPI, bbox_inches='tight')
+        f.savefig(f'{out_folder}/all_table_picture.png', dpi=MAIN_DPI, bbox_inches='tight')
     else:
-        f.savefig(f'{out_folder}{descr}_picture.png', dpi=MAIN_DPI, bbox_inches='tight')
+        f.savefig(f'{out_folder}/{descr}_picture.png', dpi=MAIN_DPI, bbox_inches='tight')
     plt.close(f)
 
 

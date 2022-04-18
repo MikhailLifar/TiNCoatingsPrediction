@@ -3,10 +3,20 @@ import numpy as np
 import pandas as pd
 
 
-def clean_list(dataframe, li, inplace=True):
+def clean_list(df: pd.DataFrame, li: list, inplace=True):
+    """
+    
+    The function deletes from list of names
+    each name that is not he name of dataframe column
+    
+    :param df: 
+    :param li: 
+    :param inplace: 
+    :return: 
+    """
     if not isinstance(li, list):
         li = list(li)
-    columns = list(dataframe.columns)
+    columns = list(df.columns)
     i = 0
     if inplace:
         while i < len(li):
@@ -29,6 +39,15 @@ def del_per_index(li, i):
 
 
 def remove_many(li, del_li):
+    """
+    The function returns list of elements from 1st object
+    which are not elements of second object
+
+    :param li:
+    :param del_li:
+    :return: list
+    """
+
     output = []
     for elem in li:
         if elem not in del_li:
@@ -38,6 +57,13 @@ def remove_many(li, del_li):
 
 
 def add_list(list1, list2):
+    """
+    The function returns the list that is the union of objects,
+    order of elements isn't changing
+    :param list1:
+    :param list2:
+    :return:
+    """
     output = copy.deepcopy(list1)
     for elem in list2:
         if elem not in list1:
@@ -104,8 +130,8 @@ def scoreFast(y, predictY):
         u = np.mean(np.linalg.norm(y - predictY, axis=1, ord=2)**2)
         v = np.mean(np.linalg.norm(y - np.mean(y, axis=0).reshape([1,y.shape[1]]), axis=1, ord=2)**2)
     if v == 0:
-        return 0
-    return 1-u/v
+        return 0.
+    return 1. - u / v
 
 
 def scoreByConstPredict(y, predictY, predictConst):

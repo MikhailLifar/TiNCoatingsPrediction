@@ -8,12 +8,12 @@ from sklearn.ensemble import ExtraTreesRegressor, ExtraTreesClassifier
 from usable_functions_1 import *
 
 
-def get_filtered_frame(frame, delete_cols=True, delete_rows=True, good_names=[], good_rows=[]):
-    if delete_cols:
-        if delete_rows:
+def get_filtered_frame(frame, delete_names=True, delete_exps=True, good_names=[], good_rows=[]):
+    if delete_names:
+        if delete_exps:
             return frame.loc[good_rows, good_names]
         return frame.loc[:, good_names]
-    elif delete_rows:
+    elif delete_exps:
         return frame.loc[good_rows, :]
     return frame
 
@@ -50,10 +50,18 @@ def find_large_intersect_nominal_descr(frame, descrs):
     print(counts)
 
 
-def get_normal(dataframe, norm_nominal=False):
+def get_normal(df: pd.DataFrame, norm_nominal=False):
+    """
+
+    The function normalises the dataframe
+
+    :param df:
+    :param norm_nominal:
+    :return:
+    """
     # print(dataframe.dtypes)
-    data_arr = dataframe.to_numpy()
-    columns = dataframe.columns
+    data_arr = df.to_numpy()
+    columns = df.columns
     for j in range(data_arr.shape[1]):
         if (columns[j] not in nominal_descr) or norm_nominal:
             try:
@@ -68,7 +76,7 @@ def get_normal(dataframe, norm_nominal=False):
             dict_norm[columns[j]] = [1, 1]
     for j in range(data_arr.shape[1]):
         try:
-            dataframe[columns[j]] = data_arr[:, j].astype('float64')
+            df[columns[j]] = data_arr[:, j].astype('float64')
         except ValueError:
             print(columns[j] + ' is not continous!')
     # print(dataframe.dtypes)
