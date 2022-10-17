@@ -7,6 +7,9 @@
 
 # import numpy as np
 # import pandas as pd
+import \
+    os
+
 import sklearn as skl
 # from sklearn.preprocessing import OneHotEncoder, LabelEncoder, StandardScaler
 # from sklearn.experimental import enable_iterative_imputer
@@ -296,7 +299,9 @@ def get_result_one_target_per_all_others(dataframe, target_columns, used_columns
     res.T.to_excel(f'{folder}ModelingResults.xlsx')
 
 
-def article_analysis(dataframe, articles, data_columns, model_name='ExtraTR', imp='const', fill_value=-2, out_file_name='ArticleAnalysis.xlsx', predict_file_name='PredictTable.xlsx', predict_to_file=True, score_mod='mean'):
+def article_analysis(dataframe, articles, data_columns, model_name='ExtraTR', imp='const', fill_value=-2,
+                     out_file_name='ArticleAnalysis.xlsx', out_folder='.',
+                     predict_file_name='PredictTable.xlsx', predict_to_file=True, score_mod='mean'):
     if not isinstance(data_columns, np.ndarray):
         data_columns = np.array(data_columns)
     predict_frame = copy.deepcopy(dataframe)
@@ -394,7 +399,7 @@ def article_analysis(dataframe, articles, data_columns, model_name='ExtraTR', im
         output[name] = mass
         print('Progress!')
     file_name = out_file_name[:out_file_name.rfind('.')] + '_' + score_mod + '.xlsx'
-    output.to_excel(file_name)
+    output.to_excel(f'{out_folder}/{file_name}')
     if predict_to_file:
         predict_frame.T.to_excel(predict_file_name)
 
@@ -419,40 +424,43 @@ def descr_analysis(frame, columns, number_of_tests=20, model_name='ExtraTR', imp
     graph_data['statistic'] = np.zeros(columns.size)
     i_1 = 0
     for name in columns:
-        graph_data.loc[i_1, 'descriptor'] = name
-        if name in nominal_descr:
-            target_values = recove_frame.loc[dict_ind[name], name] * dict_norm[name][1] + dict_norm[name][0]
-            target_values.astype('int32')
-            cross_val_arr = skl.model_selection.cross_val_score(model_classifier, recove_frame.loc[dict_ind[name], columns[columns != name]], target_values, cv=min(10, len(dict_ind[name])))
-            # print(cross_val_arr)
-            origin_r2 = np.mean(cross_val_arr)  # R2 value
-            graph_data.loc[i_1, 'r2_arr'] = origin_r2
-        else:
-            origin_arr = recove_frame.loc[dict_ind[name], name]
-            cross_val_arr = skl.model_selection.cross_val_predict(model, recove_frame.loc[dict_ind[name], columns[columns != name]], recove_frame.loc[dict_ind[name], name], cv=min(10, len(dict_ind[name])))
-            origin_r2 = scoreFast(origin_arr, cross_val_arr)  # R2 value
-            graph_data.loc[i_1, 'r2_arr'] = origin_r2
-        random_r2 = np.empty(number_of_tests)
-        for i in range(number_of_tests):
+        try:
+            graph_data.loc[i_1, 'descriptor'] = name
             if name in nominal_descr:
-                vals, prob = np.unique(recove_frame.loc[dict_ind[name], name], return_counts=True)
-                vals = vals * dict_norm[name][1] + dict_norm[name][0]
-                vals.astype('int32')
-                sz = len(recove_frame.loc[dict_ind[name], name])
-                prob = prob/sz
-                ind = np.random.multinomial(n=1, pvals=prob, size=sz)
-                random_values = np.array([vals[np.where(ind[k])[0][0]] for k in range(sz)])
-                cross_val_arr = skl.model_selection.cross_val_score(model_classifier, recove_frame.loc[dict_ind[name],
-                                            columns[columns != name]], random_values, cv=min(10, len(dict_ind[name])))
-                random_r2 = np.mean(cross_val_arr)
+                target_values = recove_frame.loc[dict_ind[name], name] * dict_norm[name][1] + dict_norm[name][0]
+                target_values.astype('int32')
+                cross_val_arr = skl.model_selection.cross_val_score(model_classifier, recove_frame.loc[dict_ind[name], columns[columns != name]], target_values, cv=min(10, len(dict_ind[name])))
+                # print(cross_val_arr)
+                origin_r2 = np.mean(cross_val_arr)  # R2 value
+                graph_data.loc[i_1, 'r2_arr'] = origin_r2
             else:
-                random_values = get_random_values(recove_frame.loc[dict_ind[name], name], distribution='shuffle_origin')
-                cross_val_arr = skl.model_selection.cross_val_predict(model, recove_frame.loc[dict_ind[name], columns[columns != name]], random_values, cv=min(10, len(dict_ind[name])))
-                random_r2[i] = scoreFast(random_values, cross_val_arr)
-        print(name, np.sum(origin_r2 > random_r2) / number_of_tests)
-        print(origin_r2, random_r2)
-        graph_data.loc[i_1, 'statistic'] = np.sum(origin_r2 > random_r2) / number_of_tests
-        i_1 += 1
+                origin_arr = recove_frame.loc[dict_ind[name], name]
+                cross_val_arr = skl.model_selection.cross_val_predict(model, recove_frame.loc[dict_ind[name], columns[columns != name]], recove_frame.loc[dict_ind[name], name], cv=min(10, len(dict_ind[name])))
+                origin_r2 = scoreFast(origin_arr, cross_val_arr)  # R2 value
+                graph_data.loc[i_1, 'r2_arr'] = origin_r2
+            random_r2 = np.empty(number_of_tests)
+            for i in range(number_of_tests):
+                if name in nominal_descr:
+                    vals, prob = np.unique(recove_frame.loc[dict_ind[name], name], return_counts=True)
+                    vals = vals * dict_norm[name][1] + dict_norm[name][0]
+                    vals.astype('int32')
+                    sz = len(recove_frame.loc[dict_ind[name], name])
+                    prob = prob/sz
+                    ind = np.random.multinomial(n=1, pvals=prob, size=sz)
+                    random_values = np.array([vals[np.where(ind[k])[0][0]] for k in range(sz)])
+                    cross_val_arr = skl.model_selection.cross_val_score(model_classifier, recove_frame.loc[dict_ind[name],
+                                                columns[columns != name]], random_values, cv=min(10, len(dict_ind[name])))
+                    random_r2 = np.mean(cross_val_arr)
+                else:
+                    random_values = get_random_values(recove_frame.loc[dict_ind[name], name], distribution='shuffle_origin')
+                    cross_val_arr = skl.model_selection.cross_val_predict(model, recove_frame.loc[dict_ind[name], columns[columns != name]], random_values, cv=min(10, len(dict_ind[name])))
+                    random_r2[i] = scoreFast(random_values, cross_val_arr)
+            print(name, np.sum(origin_r2 > random_r2) / number_of_tests)
+            print(origin_r2, random_r2)
+            graph_data.loc[i_1, 'statistic'] = np.sum(origin_r2 > random_r2) / number_of_tests
+            i_1 += 1
+        except Exception:
+            print(f'Something went wrong! Name{name}')
     graph_data.to_excel('descr_analysis.xlsx')
 
 
@@ -587,8 +595,8 @@ def qheatmap_data(frame, folder, descr, features, model='ExtraTR', recovering='c
 #     pass
 
 
-# IMPORTANTLY!!!
-# all global lists, dicts
+# IMPORTANT!!!
+# many of global lists, dicts
 # are currently in file 'TiN_frame_process.py'
 
 dict_last_cols['_Guda_2'] = 'EN'
@@ -604,9 +612,13 @@ postfix = '.from1to3'
 
 file_input_data = f'{input_folder_prefix}DataTable{input_postfix}.xlsx'
 
-names = pd.read_excel(file_input_data, usecols='C', skiprows=1).to_numpy().reshape(1, -1)[0]
+descrs = pd.read_excel(file_input_data, usecols='C', skiprows=1).to_numpy().reshape(1, -1)[0]
+# 0.1: soft filter; 2.1: hard filter
+# values in article: -2. for fig1, S1, S2; 2.1 for fig2; 0.1, 2.1 for fig3, but mostly used prepared data;
+# 2.1 for fig 4, 5, but mostly used prepared data;
+filter_rubbish = (pd.read_excel(file_input_data, usecols='E', skiprows=1) > -1.1).to_numpy().reshape(1, -1)[0]
 good = (pd.read_excel(file_input_data, usecols='E', skiprows=1) > 2.1).to_numpy().reshape(1, -1)[0]
-good_descrs = names[good]
+good_descrs = descrs[good]
 
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # поменять диапозон столбцов если изменится число экспериментов
@@ -618,8 +630,8 @@ assert len(x.columns) == dict_num_exps[input_postfix], 'Check the number of expe
 x = x.T
 x.reset_index(drop=True, inplace=True)
 
-x.columns = names
-good_exp = np.arange(x.shape[0])[x['Bad'].isna()]
+x.columns = descrs
+good_exp_inds = np.arange(x.shape[0])[x['Bad'].isna()]
 
 # !!! не забудь раскомменировать строчки 593-597
 # degree of main_chance:
@@ -632,9 +644,24 @@ good_exp = np.arange(x.shape[0])[x['Bad'].isna()]
 # x.to_excel('x_file.xlsx')
 # exit(0)
 
-# arts_descrs_picture(x, hist_or_bar='bar')
+# arts_descrs_picture(x, hist_or_bar='bar', out_folder=f'{PLOT_FOLDER}/')  # figS1
 
-# x = get_filtered_frame(x, delete_names=True, delete_exps=True, good_names=good_descrs, good_rows=good_exp)
+PLOT_FOLDER = './221010_pictures/test_all_plots'
+if not os.path.exists(PLOT_FOLDER):
+    os.makedirs(PLOT_FOLDER)
+all_plots(get_filtered_frame(x, True, False, filter_rubbish, None), PLOT_FOLDER,
+          filter_ops=(True, True, good_descrs, good_exp_inds),
+          results_ops={'data_file_path': '22_04_results/unfiltered/ModelingResults.xlsx',
+                       'one_more_file_path': '22_04_results/filtered/ModelingResults.xlsx',
+                       'out_file_name': 'fig3',
+                       'bar_descrs': clean_list(x, ['H'], inplace=False),
+                       'add_text_plot': [(0.56, 0.95, 'ExtraTrees'), (0.72, 0.95, 'SVM'), (0.8, 0.95, 'RidgeCV'), ],
+                       'text_plot_ops': {'transform': True}},
+          importance_ops={'in_path': '22_04_results/unfiltered/importance_data.xlsx', 'name': 'H'},
+          qheatmap_ops=('.', ))
+exit(0)
+
+x = get_filtered_frame(x, delete_names=True, delete_exps=False, good_names=good_descrs, good_exps=good_exp_inds)
 x.reset_index(drop=True, inplace=True)
 
 arts, inds = np.unique(x['PaperID'], return_index=True)
@@ -671,7 +698,7 @@ FILL_VALUE = -2
 # -----
 # x = new_x
 
-delete_empty_descriptors(x, names)
+delete_empty_descriptors(x, descrs)
 
 # !!! не забудь раскомменировать строчку 564
 # score_mod = 'relative'
@@ -680,13 +707,14 @@ delete_empty_descriptors(x, names)
 # x.to_excel('Check_x.xlsx')
 # exit(0)
 
-# count_sparsity(x.loc[:, remove_many(x.columns, ['PaperID', 'Bad'])], create_bar=True)
-#
-get_descr_picture(x, x.columns, all_table=True, out_folder='22_04_results')
+count_sparsity_plotting_bar(x.loc[:, remove_many(x.columns, ['PaperID', 'Bad'])], create_bar=True,  # fig 2, S2
+                            out_file_path=f'{PLOT_FOLDER}/fig2{EXT}')
+
+# descr_sparcity_table(x, x.columns, all_table=True, out_folder=PLOT_FOLDER)    # fig1
 
 # x.to_excel('x_file.xlsx')
 
-# all_plots('new_res_27_12_21/')
+# all_plots('new_res_27_12_21/')   # the work is not finished on this!
 exit(0)
 
 # for name in x.columns:
@@ -708,7 +736,7 @@ get_normal(x, norm_nominal=True)
 # qheatmap_data(x, descr='H', features=np.array(best_features),
 #               folder='NoFilterTry_22_04_14/',
 #               model='ExtraTR', recovering='const')
-# quality_heatmap('qheatmap_data.xlsx')
+quality_heatmap(out_folder=PLOT_FOLDER)    # fig5
 
 # x.loc[:, clean_list(x, nominal_descr, inplace=False)].to_excel('x_file_3.xlsx')
 
@@ -728,7 +756,7 @@ get_normal(x, norm_nominal=True)
 
 # current_cols = remove_many(x.columns, ['PaperID', 'Bad', 'CheckSum_N2Press_SubT', 'CheckSum_DeposRate_VoltBias'])
 # descr_analysis(x, current_cols)
-# bars_for_descr_analysis('descr_analysis.xlsx')
+# bars_for_descr_analysis()
 
 # data_analysis(x)
 # exit(0)
@@ -739,23 +767,30 @@ score_mode = 'relative'
 # recove_x = recovery_data(x, remove_many(x.columns, ['PaperID', 'Bad', 'CheckSum_N2Press_SubT', 'CheckSum_DeposRate_VoltBias']), remove_many(x.columns, ['PaperID', 'Bad', 'CheckSum_N2Press_SubT', 'CheckSum_DeposRate_VoltBias']), recovery_method='iterative', num_iter=500)
 # recove_x.to_excel('ResultRecovering.xlsx')
 
-# article_analysis(x, articles_names, remove_many(list(x.columns), ['PaperID', 'Bad', 'CheckSum_N2Press_SubT', 'CheckSum_DeposRate_VoltBias']), predict_to_file=False, model_name='ExtraTR', score_mod=score_mod)
-# get_articles_picture('', score_mod=score_mode)
+# article_analysis(x, articles_names, remove_many(list(x.columns), ['PaperID', 'Bad', 'CheckSum_N2Press_SubT', 'CheckSum_DeposRate_VoltBias']), predict_to_file=False, model_name='ExtraTR', score_mod=score_mode,
+#       out_folder='22_04_results')
+# get_articles_picture('22_04_results/', score_mod=score_mode)
 
 # x = recovery_data(x, exp_descr, recovery_method='const', fill_value=FILL_VALUE)
-# bar_descrs = ['H', 'E', 'CoatMu', 'CritLoad']
-bar_descrs = ['H']
-get_result(x, ['H'], exp_descr, fill_value=FILL_VALUE, crossval_mode='3:1', count_importance=True, folder='22_04_results/unfiltered/', articles=articles_names, draw_picture=True)
+# get_result(x, ['H'], exp_descr, fill_value=FILL_VALUE, crossval_mode='3:1', count_importance=True, folder='22_04_results/unfiltered/', articles=articles_names, draw_picture=True)
 # get_result(x, mech_descr, exp_descr, fill_value=FILL_VALUE, crossval_mode='3:1', folder='InverseProblem_12_01_22/', articles=articles_names, draw_picture=False)
 
 # %INVERSE PROBLEM
 # get_result(x, remove_many(exp_descr, nominal_descr), ['H'], fill_value=FILL_VALUE, crossval_mode='3:1', count_importance=False, folder='InverseProblem_12_01_22/', articles=articles_names, draw_picture=False)
 # get_result_one_target_per_all_others(x, remove_many(exp_descr, nominal_descr), ['H'], fill_value=FILL_VALUE, crossval_mode='3:1', count_importance=False, folder='InverseProblem_12_01_22/', articles=articles_names, draw_picture=False)
 
+# bar_descrs = ['H', 'E', 'CoatMu', 'CritLoad']
+bar_descrs = ['H']
 # add_text={'s': 'filtered frame', 'x': 0.0, 'y': 0.9}
-bar_for_get_result('22_04_results/unfiltered/ModelingResults.xlsx', bar_descrs=clean_list(x, bar_descrs, inplace=False),
-                   add_text='for unfiltered data')
-# importance_bars('22_04_results/unfiltered/', 'H')
+bar_for_get_result('22_04_results/unfiltered/ModelingResults.xlsx',    # fig 3
+                   out_folder=PLOT_FOLDER,
+                   one_more_file_path='22_04_results/filtered/ModelingResults.xlsx',
+                   out_file_name='fig3',
+                   bar_descrs=clean_list(x, bar_descrs, inplace=False),
+                   add_text_plot=[(0.56, 0.95, 'ExtraTrees'), (0.72, 0.95, 'SVM'), (0.8, 0.95, 'RidgeCV'), ],
+                   text_plot_ops={'transform': True},
+                   )
+importance_bars('22_04_results/unfiltered/importance_data.xlsx', '221010_pictures', 'H')   # fig4
 
 # model_create_frame_fit(recovery_data(x, exp_descr, recovery_method='knn', fill_value=FILL_VALUE), mech_descr, exp_descr, create_method='ExtraTR', crossval_mode='3:1', mod='all', draw_picture=False, out_folder_picture='Scatters/Scatters_predict/table3/')
 

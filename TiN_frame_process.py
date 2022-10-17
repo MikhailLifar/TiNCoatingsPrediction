@@ -8,13 +8,13 @@ from sklearn.ensemble import ExtraTreesRegressor, ExtraTreesClassifier
 from usable_functions_1 import *
 
 
-def get_filtered_frame(frame, delete_names=True, delete_exps=True, good_names=[], good_rows=[]):
+def get_filtered_frame(frame, delete_names=True, delete_exps=True, good_names=[], good_exps=[]):
     if delete_names:
         if delete_exps:
-            return frame.loc[good_rows, good_names]
+            return frame.loc[good_exps, good_names]
         return frame.loc[:, good_names]
     elif delete_exps:
-        return frame.loc[good_rows, :]
+        return frame.loc[good_exps, :]
     return frame
 
 

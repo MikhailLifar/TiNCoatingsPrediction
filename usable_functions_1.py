@@ -7,7 +7,7 @@ def clean_list(df: pd.DataFrame, li: list, inplace=True):
     """
     
     The function deletes from list of names
-    each name that is not he name of dataframe column
+    each name that is not name of dataframe column
     
     :param df: 
     :param li: 
