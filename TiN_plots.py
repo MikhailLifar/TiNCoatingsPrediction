@@ -2,20 +2,21 @@ import os.path
 
 import matplotlib
 import matplotlib.pyplot as plt
-# import numpy as np
-# import pandas as pd
 
 import seaborn as sns
 
-from usable_functions_1 import *
-from TiN_frame_process import dict_ind, str_descr, exp_descr, get_filtered_frame
+from TiN_utils import *
+from TiN_frame_process import dict_ind, str_descr, exp_descr, filter_df, delete_empty_invalid_descriptors
 
 from pyfitit import plotting
 
-FIGSIZE_MAIN = (16 / 3 * 2, 9 / 3 * 2)
-FIGSIZE_TALL = (16 / 3 * 2, 1.5 * 9 / 3 * 2)
+FIGSIZE_MAIN = (16 / 3 * 2, 9 / 3 * 2)  # DON'T CHANGE THIS!
+FIGSIZE_TALL = (16 / 3 * 2, 1.8 * 9 / 3 * 2)
+FIGSIZE_SMALL_TALL = (16 / 3 * 2, 1.25 * 9 / 3 * 2)
+FIGSIZE_NARROW = (0.5 * 16 / 3 * 2, 1.8 * 9 / 3 * 2)
 
 FONTSIZE_MAIN = 15
+FONTSIZE_0 = 22
 FONTSIZE_1 = 14
 FONTSIZE_2 = 6
 
@@ -69,9 +70,9 @@ def count_sparsity_plotting_bar(frame, create_bar=False, out_file_path=f'./spars
     exps_sparsity = missing_counts_for_exps / frame.shape[1]
 
     if create_bar:
-        fig, ax = plt.subplots(figsize=FIGSIZE_MAIN)
-        ax.tick_params(axis='x', labelsize=FONTSIZE_1, labelrotation=90)
-        ax.tick_params(axis='y', labelsize=FONTSIZE_1)
+        fig, ax = plt.subplots(figsize=FIGSIZE_SMALL_TALL)
+        ax.tick_params(axis='x', labelsize=FONTSIZE_0)
+        ax.tick_params(axis='y', labelsize=FONTSIZE_0)
         fullness_arr = 1 - descrs_sparsity
         ids = np.argsort(fullness_arr)[::-1]
 
@@ -80,7 +81,7 @@ def count_sparsity_plotting_bar(frame, create_bar=False, out_file_path=f'./spars
         save_csv(bar_cols, bar_cols, 'descr', 'fullness', f'{file_with_no_ext}.csv')
         ax.barh(bar_cols, bar_values,
                color=color_arr_from_arr(bar_values, init_color=(1, 0.9, 0.9), finish_color=(1, 0.2, 0.2), bottom=0., up=1.))
-        ax.set_xlabel('1 - sparsity', fontsize=FONTSIZE_1)
+        ax.set_xlabel('1 - sparsity', fontsize=FONTSIZE_0)
         fig.savefig(out_file_path, dpi=MAIN_DPI, bbox_inches='tight')
         plt.close(fig)
 
@@ -96,8 +97,8 @@ def count_sparsity_plotting_bar(frame, create_bar=False, out_file_path=f'./spars
 
 
 # fig 3
-def bar_for_get_result(data_file_path, bar_descrs, out_folder=None, out_file_name=None, add_text=None,
-                       add_text_plot=None, text_plot_ops=None, one_more_file_path=None):
+def training_results_bar(data_file_path, bar_descrs, out_folder=None, out_file_name=None, add_to_title=None,
+                         add_text_plot=None, text_plot_ops=None, one_more_file_path=None):
     # read and check
     r2_data = pd.read_excel(data_file_path)
     # r2_data.to_excel('bar_check.xlsx')
@@ -139,7 +140,7 @@ def bar_for_get_result(data_file_path, bar_descrs, out_folder=None, out_file_nam
         if i % num_models == num_models // 2:
             lbl = imp_mass[i // num_models]
             if lbl == 'knn':
-                lbl = 'KNN'
+                lbl = 'k-NN'
             labels.append(f'{lbl}')
         else:
             labels.append('')
@@ -148,7 +149,7 @@ def bar_for_get_result(data_file_path, bar_descrs, out_folder=None, out_file_nam
     # sgn = -1
     # build graphs
     for i, descr in enumerate(bar_descrs):
-        fig, ax = plt.subplots(figsize=FIGSIZE_MAIN)
+        fig, ax = plt.subplots(figsize=FIGSIZE_SMALL_TALL)
         # fig.update_layout(legend_orientation='h')
         r2_values = r2_data.loc[i + 2, 0:]
         r2_values[r2_values < 0.05] = 0.05
@@ -180,17 +181,17 @@ def bar_for_get_result(data_file_path, bar_descrs, out_folder=None, out_file_nam
                 text_plot_ops['transform'] = ax.transAxes
             if isinstance(add_text_plot, list):
                 for x_y_s in add_text_plot:
-                    ax.text(*x_y_s, **text_plot_ops, color=color_per_name[x_y_s[2]], fontsize=FONTSIZE_MAIN)
+                    ax.text(*x_y_s, **text_plot_ops, color=color_per_name[x_y_s[2]], fontsize=FONTSIZE_0)
             elif isinstance(add_text_plot, dict):
-                ax.text(*add_text_plot, **text_plot_ops, fontsize=FONTSIZE_MAIN)
-        ax.set_ylabel('R2 score', fontsize=FONTSIZE_MAIN)
-        if add_text is not None:
-            ax.set_title(f'R2 scores\n{add_text}', fontsize=FONTSIZE_MAIN)
+                ax.text(*add_text_plot, **text_plot_ops, fontsize=FONTSIZE_0)
+        ax.set_ylabel('$R^{2}$ score', fontsize=FONTSIZE_0)
+        if add_to_title is not None:
+            ax.set_title(f'R2 scores\n{add_to_title}', fontsize=FONTSIZE_0)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.set_xticks(x_data)
         ax.set_xticklabels(labels)
-        ax.tick_params(labelsize=FONTSIZE_1)
+        ax.tick_params(labelsize=FONTSIZE_0)
         # ax.legend()
         if out_file_name is None:
             out_file_name = f'score_bars_{descr}'
@@ -216,18 +217,22 @@ def importance_bars(in_path, out_folder, name):
     for i, imp in enumerate(imp_mass):
         assert columns[2 * i][columns[2 * i].rfind('_') + 1:] == imp
         assert columns[2 * i + 1][columns[2 * i + 1].rfind('_') + 1:] == imp, columns[i][columns[2 * i + 1].rfind('_') + 1:]
-        fig, ax = plt.subplots(1, figsize=FIGSIZE_MAIN)
-        ax.tick_params(labelsize=FONTSIZE_1)
-        ax.barh(importance_data[columns[2 * i]], importance_data[columns[2 * i + 1]],
+        fig, ax = plt.subplots(1, figsize=FIGSIZE_SMALL_TALL)
+        ax.tick_params(labelsize=FONTSIZE_0)
+        improved_lbls = change_descrs_names_for_plot(importance_data[columns[2 * i]])
+        ax.barh(improved_lbls, importance_data[columns[2 * i + 1]],
                 color=color_arr_from_arr(np.array(importance_data[columns[2 * i + 1]]), init_color=(1.0, 1.0, 1.0), finish_color=(1.0, 0.9, 0.4), bottom=-0.25))
         # ax.barh(used_columns, model_name.feature_importances_, color='orange')
         # ax.tick_params(labelrotation=45)
-        ax.set_title(f'Feature importance {name}', fontsize=FONTSIZE_MAIN)
+        # ax.set_title(f'Feature importance {name}', fontsize=FONTSIZE_MAIN)
+        imp_1 = imp if imp != 'knn' else 'k-NN'
+        ax.text(0.96, 0.03, f'imputing: {imp_1}', transform=ax.transAxes, va='bottom', ha='right',
+                fontsize=FONTSIZE_0)
         fig.savefig(f'{out_folder}/feature_importance_{imp}_{name}{EXT}', dpi=MAIN_DPI, bbox_inches='tight')
         plt.close(fig)
 
 
-def bars_for_descr_analysis(folder=''):
+def descr_analysis_stat_bars(folder=''):
     graph_data = pd.read_excel(folder + 'descr_analysis.xlsx')
     # graph_data.to_excel('bar_check.xlsx')
     columns = graph_data['descriptor']
@@ -261,6 +266,7 @@ def get_descr_distribution_picture(frame, descr, out_folder='', bins=50, color='
 
 
 # fig 1
+# 31 descriptors in the article
 def descr_sparcity_table(df, columns, descr='', all_table=False, out_folder='.'):
     if all_table:
         matr = df.T.isna().astype('int64').to_numpy()
@@ -270,13 +276,13 @@ def descr_sparcity_table(df, columns, descr='', all_table=False, out_folder='.')
         matr = df.loc[dict_ind[descr], columns].T.isna().astype('int64').to_numpy()
         # title = f'График, наглядно демонстрирующий разреженность матрицы данных составленной из столбцов в которых {descr} notNull'
     f, ax = plt.subplots(figsize=FIGSIZE_TALL)
-    ax.tick_params(labelsize=FONTSIZE_1)
+    ax.tick_params(labelsize=FONTSIZE_0)
     ax = sns.heatmap(matr, linewidths=0.1, xticklabels=False, yticklabels=change_descrs_names_for_plot(columns),
                      ax=ax, cbar=False, cmap=['blue', 'white'])
     # ax.set_title(title, fontsize=MAIN_PLOT_FONT_SIZE)
     articles_number = np.unique(df['PaperID']).size
     ax.text(0.5, -0.05, f'{matr.shape[1]} experiments from {articles_number} articles',
-            transform=ax.transAxes, va='center', ha='center', fontsize=FONTSIZE_1)
+            transform=ax.transAxes, va='center', ha='center', fontsize=FONTSIZE_0)
     # ax.arrow(0.01, 0., 0.95, 0., transform=ax.transAxes, width=0.005, head_length=4.5 * 0.005, shape='full',
     #          color=(0.3, 0.3, 0.3,), zorder=4)
     if all_table:
@@ -288,7 +294,7 @@ def descr_sparcity_table(df, columns, descr='', all_table=False, out_folder='.')
 
 # эта функция отчасти дублирует функцию get_scatter_plots
 def descr_correlate_picture(frame, used_descr, target_descr, out_folder='', mode='many_pictures'):
-    inds = np.array(intersect_lists(dict_ind[target_descr], dict_ind[used_descr]))
+    inds = np.array(lists_intersection(dict_ind[target_descr], dict_ind[used_descr]))
     if not inds.size:
         return
     if used_descr in str_descr:
@@ -328,7 +334,7 @@ def descr_correlate_picture(frame, used_descr, target_descr, out_folder='', mode
 # fig S1
 def arts_descrs_picture(frame, out_folder='.', hist_or_bar='hist'):
     _, counts = np.unique(frame['PaperID'], return_counts=True)
-    fig, ax = plt.subplots(1, figsize=FIGSIZE_TALL)
+    fig, ax = plt.subplots(1, figsize=FIGSIZE_NARROW)
     if hist_or_bar == 'hist':
         _, frequency = np.unique(counts, return_counts=True)
         max_counts = np.max(counts)
@@ -340,15 +346,15 @@ def arts_descrs_picture(frame, out_folder='.', hist_or_bar='hist'):
         unique_counts, frequency = np.unique(counts, return_counts=True)
         save_csv(unique_counts, frequency, 'counts', 'frequency', f'{out_folder}/arts_descrs_picture.csv')
         ax.bar(unique_counts, frequency, color=(0.8, 0.8, 0.25))
-        ax.tick_params(labelsize=FONTSIZE_1)
-        ax.set_xlabel('Number of experiments in article', fontsize=16)
-        ax.set_ylabel('Number of articles', fontsize=16)
+        ax.tick_params(labelsize=FONTSIZE_0)
+        ax.set_xlabel('Number of experiments in article', fontsize=FONTSIZE_0)
+        ax.set_ylabel('Number of articles', fontsize=FONTSIZE_0)
     ax.set_yticks(np.arange(np.max(frequency) + 1))
     fig.savefig(f'{out_folder}/arts_descrs_picture{EXT}', dpi=MAIN_DPI, bbox_inches='tight')
     plt.close(fig)
 
 
-def get_articles_picture(folder, score_mod='relative'):
+def article_analysis_table(folder, score_mod='relative'):
     if score_mod == 'relative':
         vmin = -10
         vmax = 0
@@ -391,72 +397,57 @@ def quality_heatmap(in_folder='.', out_folder=''):
     df = pd.read_excel(f'{in_folder}/qheatmap_data.xlsx')
     del df['Unnamed: 0']
     matrix_r2 = df.to_numpy()
-    features = df.columns
-    f, ax = plt.subplots(1, figsize=(FIGSIZE_MAIN[0], 1.2 * FIGSIZE_MAIN[1]))
+    features = change_descrs_names_for_plot(df.columns)
+    f, ax = plt.subplots(1, figsize=FIGSIZE_SMALL_TALL)
     ax = sns.heatmap(matrix_r2, xticklabels=features, vmin=0., vmax=0.8, yticklabels=features)
-    ax.tick_params(axis='x', labelrotation=90, labelsize=FONTSIZE_1)
-    ax.tick_params(axis='y', labelsize=FONTSIZE_1)
+    ax.tick_params(axis='x', labelrotation=90, labelsize=FONTSIZE_0)
+    ax.tick_params(axis='y', labelsize=FONTSIZE_0)
     # ax.set_xlabel('predicted')
     # ax.set_ylabel('true')
     f.savefig(f'{out_folder}/heat_map{EXT}', dpi=MAIN_DPI, bbox_inches='tight')
     plt.close(f)
 
 
-def all_plots(frame, out_folder, **kwargs):
+def all_plots(df, dest_folder, **kwargs):
+
+    arts_descrs_picture(df, dest_folder, hist_or_bar='bar')
+
+    delete_empty_invalid_descriptors(df, df.columns)
+    kwargs['filter_ops'][2] = np.array(clean_list_of_names(df, kwargs['filter_ops'][2], False))
 
     def data_stat_block(df, subdir=None):
         if subdir is not None:
-            plot_dir_path = f'{out_folder}/{subdir}'
+            plot_dir_path = f'{dest_folder}/{subdir}'
         else:
-            plot_dir_path = out_folder
-        arts_descrs_picture(df, plot_dir_path, hist_or_bar='bar')
+            plot_dir_path = dest_folder
         count_sparsity_plotting_bar(df.loc[:, remove_many(df.columns, ['PaperID', 'Bad'])], create_bar=True,  # fig 2, S2
                                     out_file_path=f'{plot_dir_path}/fig2{EXT}')
         descr_sparcity_table(df, df.columns, all_table=True, out_folder=plot_dir_path)
 
     if 'filter_ops' in kwargs:
-        os.makedirs(f'{out_folder}/unfiltered/', exist_ok=True)
-        os.makedirs(f'{out_folder}/filtered/', exist_ok=True)
-        data_stat_block(frame, 'unfiltered')
-        frame = get_filtered_frame(frame, *(kwargs['filter_ops']))
-        data_stat_block(frame, 'filtered')
+        os.makedirs(f'{dest_folder}/unfiltered/', exist_ok=True)
+        os.makedirs(f'{dest_folder}/filtered/', exist_ok=True)
+        data_stat_block(df, 'unfiltered')
+        df = filter_df(df, *(kwargs['filter_ops']))
+        data_stat_block(df, 'filtered')
     else:
-        data_stat_block(frame)
+        data_stat_block(df)
 
     if 'results_ops' in kwargs:
-        bar_for_get_result(out_folder=out_folder, **(kwargs['results_ops']))
+        training_results_bar(out_folder=dest_folder, **(kwargs['results_ops']))
     if 'importance_ops' in kwargs:
-        importance_bars(out_folder=out_folder, **(kwargs['importance_ops']))
+        importance_bars(out_folder=dest_folder, **(kwargs['importance_ops']))
     if 'qheatmap_ops' in kwargs:
-        quality_heatmap(*(kwargs['qheatmap_ops']), out_folder)
+        quality_heatmap(*(kwargs['qheatmap_ops']), dest_folder)
 
 
-# def all_plots(main_path=''):
-#     # arts descrs picture
-#     frame = pd.read_excel(main_path + 'origin_frame.xlsx')
-#     frame.index = pd.read_excel(main_path + 'origin_frame.xlsx', usecols='A')['Unnamed: 0']
-#     del frame['Unnamed: 0']
-#     arts_descrs_picture(frame, hist_or_bar='bar', out_folder=main_path)
-#     current_path = main_path + 'descr_analysis/'
-#     bars_for_descr_analysis(folder=current_path)
-#     for fold in 'no_filter/', 'filter/':
-#         current_path = main_path + fold
-#         frame = pd.read_excel(current_path + 'x_file.xlsx')
-#         frame.index = pd.read_excel(current_path + 'x_file.xlsx', usecols='A')['Unnamed: 0']
-#         del frame['Unnamed: 0']
-#         columns = frame.columns
-#         # sparsity pictures
-#         count_sparsity_plotting_bar(frame.loc[:, remove_many(columns, ['PaperID', 'Bad'])], create_bar=True, out_folder=current_path)
-#         descr_sparcity_table(frame, columns, all_table=True, out_folder=current_path)
-#         # article_analysis pictures
-#         for mod in 'relative', 'mean':
-#             get_articles_picture(current_path, score_mod=mod)
-#         # get_result pictures
-#         bar_descrs = ['H']
-#         bar_for_get_result(current_path, bar_descrs=clean_list(frame, bar_descrs, inplace=False))
-#     current_path = main_path + 'filter/'
-#     # importance pictures
-#     importance_bars(current_path, 'H')
-#     # quality heatmap
-#     quality_heatmap(
-#         in_out_folder=current_path)
+def plot_test(out_path):
+    fig, ax = plt.subplots(1, figsize=(16 * 3 / 2, 9 * 3 / 2))
+    x_arr = np.linspace(-10, 10, 500)
+    y_arr = x_arr * x_arr
+    ax.plot(x_arr, y_arr)
+    fig.savefig(out_path, dpi=MAIN_DPI)
+
+
+if __name__ == '__main__':
+    pass

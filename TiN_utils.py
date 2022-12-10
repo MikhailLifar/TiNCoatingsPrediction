@@ -3,32 +3,32 @@ import numpy as np
 import pandas as pd
 
 
-def clean_list(df: pd.DataFrame, li: list, inplace=True):
+def clean_list_of_names(df: pd.DataFrame, names: list, inplace=True):
     """
     
     The function deletes from list of names
     each name that is not name of dataframe column
     
     :param df: 
-    :param li: 
+    :param names: 
     :param inplace: 
     :return: 
     """
-    if not isinstance(li, list):
-        li = list(li)
-    columns = list(df.columns)
+
+    columns = df.columns
     i = 0
     if inplace:
-        while i < len(li):
-            if li[i] not in columns:
-                li.pop(i)
+        assert isinstance(names, list)
+        while i < len(names):
+            if names[i] not in columns:
+                names.pop(i)
             else:
                 i += 1
     else:
         output = []
-        while i < len(li):
-            if li[i] in columns:
-                output.append(li[i])
+        while i < len(names):
+            if names[i] in columns:
+                output.append(names[i])
             i += 1
 
         return output
@@ -56,22 +56,22 @@ def remove_many(li, del_li):
     return output
 
 
-def add_list(list1, list2):
+def lists_union(li1, li2):
     """
     The function returns the list that is the union of objects,
     order of elements isn't changing
-    :param list1:
-    :param list2:
+    :param li1:
+    :param li2:
     :return:
     """
-    output = copy.deepcopy(list1)
-    for elem in list2:
-        if elem not in list1:
+    output = copy.deepcopy(li1)
+    for elem in li2:
+        if elem not in li1:
             output.append(elem)
     return output
 
 
-def intersect_lists(li1, li2):
+def lists_intersection(li1, li2):
     out = []
     for elem in li1:
         if elem in li2:
@@ -80,6 +80,15 @@ def intersect_lists(li1, li2):
 
 
 def color_arr_from_arr(arr, init_color=(0.6, 0, 0.9), finish_color=(0.9, 0.9, 0.5), bottom=0., up=0.):
+    """
+
+    :param arr: 1-D array od scalars
+    :param init_color:
+    :param finish_color:
+    :param bottom:
+    :param up:
+    :return: 2-D array, each row is RGB value
+    """
     assert isinstance(arr, np.ndarray), 'arr should be np.ndarray'
     if not (bottom or up):
         bottom = np.min(arr)
@@ -99,6 +108,13 @@ def color_arr_from_arr(arr, init_color=(0.6, 0, 0.9), finish_color=(0.9, 0.9, 0.
 
 
 def get_random_values(obj, distribution='random'):
+    """
+
+    :param obj: 1-D container of numbers
+    :param distribution:
+    :return: 1-D array with the same size as input container
+    """
+
     if distribution == 'same_distribution':
         if isinstance(obj, pd.core.series.Series):
             mass = obj.to_numpy()

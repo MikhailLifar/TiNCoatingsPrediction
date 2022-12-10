@@ -1,56 +1,52 @@
-import copy
-import numpy as np
 from sklearn.impute import SimpleImputer, KNNImputer
 from sklearn.impute._iterative import IterativeImputer
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder, StandardScaler
 from sklearn.ensemble import ExtraTreesRegressor, ExtraTreesClassifier
 
-from usable_functions_1 import *
+from TiN_utils import *
 
 
-def get_filtered_frame(frame, delete_names=True, delete_exps=True, good_names=[], good_exps=[]):
+def filter_df(df, delete_names=True, delete_exps=True, good_names=None, good_exps=None):
     if delete_names:
         if delete_exps:
-            return frame.loc[good_exps, good_names]
-        return frame.loc[:, good_names]
+            return df.loc[good_exps, good_names]
+        return df.loc[:, good_names]
     elif delete_exps:
-        return frame.loc[good_exps, :]
-    return frame
+        return df.loc[good_exps, :]
+    return df
 
 
-def delete_empty_descriptors(frame, names):
-    names = clean_list(frame, names, inplace=False)
+def delete_empty_invalid_descriptors(frame, names):
+    names = clean_list_of_names(frame, names, inplace=False)
 
+    deleted = []
     for name in names:
         ind = pd.notnull(frame[name])
-        if name[:5] != 'Addit':
-            if len(np.unique(frame.loc[ind, name])) <= 1:
-                del frame[name]
-            else:
-                dict_ind[name] = list(frame.index[ind])
+        if (len(np.unique(frame.loc[ind, name])) > 1) and (name[:5] != 'Addit'):
+            dict_ind[name] = list(frame.index[ind])
         else:
             del frame[name]
+            deleted.append(name)
+    print(f'Following descriptors were deleted: {deleted}')
+    print(f'Frame shape after deleting empty: {frame.shape}')
 
-    print(frame.shape)
-
-    clean_list(frame, exp_descr)
-    clean_list(frame, struct_descr)
-    clean_list(frame, mech_descr)
+    for li in (exp_descr, struct_descr, mech_descr):
+        clean_list_of_names(frame, li)
 
 
-def find_large_intersect_nominal_descr(frame, descrs):
+def find_large_intersect_nominal_descr(df, descrs):
     li = []
-    for i in range(frame.shape[0]):
+    for i in range(df.shape[0]):
         elem = ''
         for descr in descrs:
-            elem += str(frame.loc[i, descr]) + ' '
+            elem += str(df.loc[i, descr]) + ' '
         li.append(elem)
     vals, counts = np.unique(li, return_counts=True)
     print(vals)
     print(counts)
 
 
-def get_normal(df: pd.DataFrame, norm_nominal=False):
+def normalize_frame(df: pd.DataFrame, norm_nominal=False):
     """
 
     The function normalises the dataframe
@@ -82,31 +78,37 @@ def get_normal(df: pd.DataFrame, norm_nominal=False):
     # print(dataframe.dtypes)
 
 
-def recovery_data(dataframe, target_columns, used_columns=[], recovery_method='simple', fill_value=0, num_iter=50):
+def recovery_data(df, names_to_recover, additional_names=None, recovery_method='simple', fill_value=0, num_iter=50):
     if recovery_method == 'hand_made':
-        return dataframe
-    if not isinstance(target_columns, list):
-        target_columns = list(target_columns)
-    if not isinstance(used_columns, list):
-        used_columns = list(used_columns)
-    fit_columns = add_list(target_columns, used_columns)
-    output = copy.deepcopy(dataframe)
+        return df
+
+    if not isinstance(names_to_recover, list):
+        names_to_recover = list(names_to_recover)
+
+    if additional_names is None:
+        additional_names = []
+    if not isinstance(additional_names, list):
+        additional_names = list(additional_names)
+
+    fit_columns = lists_union(names_to_recover, additional_names)
+    output = copy.deepcopy(df)
     if recovery_method == 'simple':
         imp = SimpleImputer(strategy='most_frequent')
     elif recovery_method == 'iterative':
         imp = IterativeImputer(estimator=ExtraTreesRegressor(), max_iter=num_iter, initial_strategy='most_frequent', random_state=0)
-        imp_classifier = IterativeImputer(estimator=ExtraTreesClassifier(), max_iter=num_iter, initial_strategy='most_frequent', random_state=0)
+        # imp_classifier = IterativeImputer(estimator=ExtraTreesClassifier(), max_iter=num_iter, initial_strategy='most_frequent', random_state=0)
     elif recovery_method == 'knn':
         imp = KNNImputer(n_neighbors=2, weights='uniform')
+    elif recovery_method == 'const':
+        imp = SimpleImputer(strategy='constant', fill_value=fill_value)
+        # imp_classifier = SimpleImputer(strategy='constant', fill_value=str(fill_value))
+
     # elif recovery_method == 'soft_imp':
     #     imp = SoftImpute()
     # elif recovery_method == 'nnm':
     #     imp = NuclearNormMinimization(verbose=True)
     # elif recovery_method == 'bi_scaler':
     #     imp = BiScaler()
-    elif recovery_method == 'const':
-        imp = SimpleImputer(strategy='constant', fill_value=fill_value)
-        imp_classifier = SimpleImputer(strategy='constant', fill_value=str(fill_value))
     # elif recovery_method == 'matr_factoriz':
     #     imp = MatrixFactorization()
     # elif recovery_method == 'similarity':
@@ -117,35 +119,33 @@ def recovery_data(dataframe, target_columns, used_columns=[], recovery_method='s
     #     imp = Solver()
     # elif recovery_method == 'datawig':
     #     imp = DwImputer(input_columns=fit_columns, output_column=target_columns)
+
     else:
         assert False, f'invalid value for recovery_method: {recovery_method}'
+
     if recovery_method != 'datawig':
-        matr = imp.fit_transform(dataframe[fit_columns])
-    # print(dataframe.dtypes)
-    # print(output.dtypes)
-    output.loc[:, target_columns] = matr[:, :len(target_columns)]
-    # for j in range(len(target_columns)):
-    #     output.loc[:, target_columns[j]] = matr[:, j]
-    # print(output.dtypes)
-    # exit(0)
+        matr = imp.fit_transform(df[fit_columns])
+
+    output.loc[:, names_to_recover] = matr[:, :len(names_to_recover)]
+
     return output
 
 
-def recove_and_normalize(frame, target_columns, used_columns=[], recovery_method='simple', fill_value=0, num_iter=50, **key_args):
-    new_fame = recovery_data(frame, target_columns, used_columns, recovery_method, fill_value, num_iter)
-    get_normal(new_fame, norm_nominal=key_args['norm_nominal'])
-    return new_fame
+def recove_and_normalize(frame, target_columns, used_columns=None, recovery_method='simple', fill_value=0, num_iter=50, **key_args):
+    new_frame = recovery_data(frame, target_columns, used_columns, recovery_method, fill_value, num_iter)
+    normalize_frame(new_frame, norm_nominal=key_args['norm_nominal'])
+    return new_frame
 
 
-def use_one_hot_encoder(dataframe, columns, nan_processor='ignore'):
+def apply_one_hot_encoder(df, columns, nan_processor='ignore'):
     enc = OneHotEncoder()
     if not isinstance(columns, list):
         columns = list(columns)
 
     for name in columns:
-        matr = enc.fit_transform(np.array(dataframe[name]).reshape(-1, 1))
+        matr = enc.fit_transform(np.array(df[name]).reshape(-1, 1))
         matr = matr.toarray()
-        del dataframe[name]
+        del df[name]
         if name in exp_descr:
             exp_descr.remove(name)
         elif name in struct_descr:
@@ -161,25 +161,25 @@ def use_one_hot_encoder(dataframe, columns, nan_processor='ignore'):
                 value_names[-1] = 'NaN'
         for j in range(length):
             new_name = name + '_' + value_names[j]
-            dataframe[new_name] = matr[:, j]
+            df[new_name] = matr[:, j]
             dict_ind[new_name] = dict_ind[name]
             exp_descr.append(new_name)
         del dict_ind[name]
 
 
-def use_label_encoder(dataframe, columns):
+def apply_label_encoder(df, columns):
     if not isinstance(columns, list):
         columns = list(columns)
 
     for name in columns:
         enc = LabelEncoder()
-        name_col = dataframe[name]
+        name_col = df[name]
         col = enc.fit_transform(name_col[name_col.notna()].to_numpy())
-        dataframe[name][name_col.notna()] = col
+        df[name][name_col.notna()] = col
         dict_labels[name] = enc.classes_
 
 
-def check_code(frame, main_chance=0.3):
+def generate_df_with_diff_dependencies(frame, main_chance=0.3):
     np.random.seed(0)
     papers = frame['PaperID']
     for name in frame.columns:
@@ -206,7 +206,7 @@ def check_code(frame, main_chance=0.3):
     return frame
 
 
-# TODO попробовать удалить, посмотреть на качество
+# TODO try to delete, then check quality
 del_names = ['DenArcCurr', 'CathNum', 'CathType']
 
 exp_descr = ['Method'] + ['CathNum', 'CathType', 'ArcCurr', 'DenArcCurr', 'ArcVolt', 'CoilCurr', 'ChambPress',
@@ -215,7 +215,7 @@ exp_descr = ['Method'] + ['CathNum', 'CathType', 'ArcCurr', 'DenArcCurr', 'ArcVo
                           'MagnetMat', 'BlockParam'] + ['SubType', 'SubComp', 'SubChar', 'SubStruct', 'SubRough',
                                                         'IonClean', 'IonImplant', 'VoltIonImplant', 'TimeIonImplant',
                                                         'SubSurfStress', 'SubH', 'SubE', 'SubHE', 'SubH3E2', 'SubMu',
-                                                        'SubJ', 'SubJk'] + ['Hum', 'HMethod'] + ['SubLayer']\
+                                                        'SubJ', 'SubJk'] + ['Hum', 'IndentMethod'] + ['SubLayer']\
             + ['DeposRate'] + ['TotalFlow', 'N2Flow', 'TargetPow'] + ['Method_1', 'Method_2', 'MagType', 'ResidPress',
                                                                       'PowDensity', 'IonAtomRatio'] + ['Indent']\
             + ['FricLoad', 'FricSpeed', 'BallSize', 'BallComp'] + ['React_or_not', 'Balanc_or_not']
@@ -227,8 +227,7 @@ struct_descr = ['DenCoat', 'CoatComp', 'CoatCompPercent', 'CoatPhaseComp', 'Coat
 mech_descr = ['H', 'E', 'HE', 'H3E2', 'CoatMu', 'Lc1', 'Lc2', 'CoatJ', 'CoatJk', 'EroDurab'] \
              + ['CoatMu_1', 'CritLoad', 'Wear']
 
-str_descr = []
-str_descr = ['Method', 'TargetComp', 'TargetGeom', 'SubType', 'IonImplant', 'SubLayer', 'HMethod', 'BallComp']
+str_descr = ['Method', 'TargetComp', 'TargetGeom', 'SubType', 'IonImplant', 'SubLayer', 'IndentMethod', 'BallComp']
 nominal_descr = ['Method_1', 'Method_2', 'React_or_not', 'Balanc_or_not', 'MagType', 'Orient'] + str_descr
 
 check_columns = ['CheckSum_N2Press_SubT', 'CheckSum_DeposRate_VoltBias']
@@ -236,14 +235,14 @@ check_columns = ['CheckSum_N2Press_SubT', 'CheckSum_DeposRate_VoltBias']
 best_features = ['PowDensity', 'CathDist', 'ResidPress', 'SubT', 'ChambPress', 'VoltBias', 'N2ArRelation',
                  'Balanc_or_not', 'SubType']
 
-# глобальные переменные словари
-# словарь, содержащий идентификатор последнего столбца с данными для разных файлов
+# global dictionaries
+# id of the last column containing data for different files
 dict_last_cols = dict()
-# словарь, содержащий число экспериментов для разных файлов
+# samples number for different files
 dict_num_exps= dict()
-# словарь, содержащий списки индексов непустых ячеек для каждого деск-ра
+# lists of idxs of not empty cells for each descriptor
 dict_ind = dict()
-# словарь, содержащий списки параметров нормировки (mean, std) для каждого деск-ра
+# lists of normalization parameters (mean, std) for each descriptor
 dict_norm = dict()
-# словарь, содержащий списки значений, соотв.- их меткам для строковых деск-ров
+# lists of descriptor values replaced by integer labels for nominal descriptors
 dict_labels = dict()
