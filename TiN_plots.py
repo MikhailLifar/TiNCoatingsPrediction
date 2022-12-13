@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from TiN_utils import *
-from TiN_frame_process import dict_ind, str_descr, exp_descr, filter_df, delete_empty_invalid_descriptors
+from TiN_frame_process import str_descr, exp_descr
 
 from pyfitit import plotting
 
@@ -252,9 +252,9 @@ def descr_analysis_stat_bars(folder=''):
     plt.close(fig)
 
 
-def get_descr_distribution_picture(frame, descr, out_folder='', bins=50, color='#ffba54'):
+def get_descr_distribution_picture(dataset, descr, out_folder='', bins=50, color='#ffba54'):
     fig, ax = plt.subplots(figsize=FIGSIZE_MAIN)
-    data = np.array(frame.loc[dict_ind[descr], descr])
+    data = np.array(dataset.df.loc[dataset.dict_idxs[descr], descr])
     total_values = data[data is not np.nan].size
     ax.hist(data, bins=bins, color=color, histtype='bar')
     ax.set_xlabel(f'Value of {descr}', fontsize=FONTSIZE_MAIN)
@@ -267,13 +267,14 @@ def get_descr_distribution_picture(frame, descr, out_folder='', bins=50, color='
 
 # fig 1
 # 31 descriptors in the article
-def descr_sparcity_table(df, columns, descr='', all_table=False, out_folder='.'):
+def descr_sparcity_table(dataset, columns, descr='', all_table=False, out_folder='.'):
+    df = dataset.df
     if all_table:
         matr = df.T.isna().astype('int64').to_numpy()
         # title = 'График разреженности\nбазы данных'
     else:
         assert len(descr), 'expect descriptor`s name, received nothing'
-        matr = df.loc[dict_ind[descr], columns].T.isna().astype('int64').to_numpy()
+        matr = df.loc[dataset.dict_idxs[descr], columns].T.isna().astype('int64').to_numpy()
         # title = f'График, наглядно демонстрирующий разреженность матрицы данных составленной из столбцов в которых {descr} notNull'
     f, ax = plt.subplots(figsize=FIGSIZE_TALL)
     ax.tick_params(labelsize=FONTSIZE_0)
@@ -292,14 +293,15 @@ def descr_sparcity_table(df, columns, descr='', all_table=False, out_folder='.')
     plt.close(f)
 
 
-# эта функция отчасти дублирует функцию get_scatter_plots
-def descr_correlate_picture(frame, used_descr, target_descr, out_folder='', mode='many_pictures'):
-    inds = np.array(lists_intersection(dict_ind[target_descr], dict_ind[used_descr]))
+# this function seems to double the function get_scatter_plots
+def descr_correlate_picture(dataset, used_descr, target_descr, out_folder='', mode='many_pictures'):
+    df = dataset.df
+    inds = np.array(lists_intersection(dataset.dict_idxs[target_descr], dataset.dict_idxs[used_descr]))
     if not inds.size:
         return
     if used_descr in str_descr:
         return
-    data = frame.loc[inds, ['PaperID', used_descr, target_descr]]
+    data = df.loc[inds, ['PaperID', used_descr, target_descr]]
     print(data.shape)
     if mode == 'many_pictures':
         for p in np.unique(data['PaperID']):
@@ -380,12 +382,13 @@ def article_analysis_table(folder, score_mod='relative'):
     plt.close(f)
 
 
-def get_scatter_plots(frame, descr, list_of_descrs, out_folder='', mode='all'):
+def get_scatter_plots(dataset, descr, list_of_descrs, out_folder='', mode='all'):
+    df = dataset.df
     for name in list_of_descrs:
         if mode == 'all':
-            x_data = frame.loc[dict_ind[name], name]
-            y_data = frame.loc[dict_ind[name], descr]
-        arts = frame.loc[dict_ind[name], 'PaperID'].to_numpy()
+            x_data = df.loc[dataset.dict_idxs[name], name]
+            y_data = df.loc[dataset.dict_idxs[name], descr]
+        arts = df.loc[dataset.dict_idxs[name], 'PaperID'].to_numpy()
         for i in range(arts.size):
             arts[i] = int(arts[i][:-1])
         arts = arts.astype('int32')
@@ -408,37 +411,37 @@ def quality_heatmap(in_folder='.', out_folder=''):
     plt.close(f)
 
 
-def all_plots(df, dest_folder, **kwargs):
-
-    arts_descrs_picture(df, dest_folder, hist_or_bar='bar')
-
-    delete_empty_invalid_descriptors(df, df.columns)
-    kwargs['filter_ops'][2] = np.array(clean_list_of_names(df, kwargs['filter_ops'][2], False))
-
-    def data_stat_block(df, subdir=None):
-        if subdir is not None:
-            plot_dir_path = f'{dest_folder}/{subdir}'
-        else:
-            plot_dir_path = dest_folder
-        count_sparsity_plotting_bar(df.loc[:, remove_many(df.columns, ['PaperID', 'Bad'])], create_bar=True,  # fig 2, S2
-                                    out_file_path=f'{plot_dir_path}/fig2{EXT}')
-        descr_sparcity_table(df, df.columns, all_table=True, out_folder=plot_dir_path)
-
-    if 'filter_ops' in kwargs:
-        os.makedirs(f'{dest_folder}/unfiltered/', exist_ok=True)
-        os.makedirs(f'{dest_folder}/filtered/', exist_ok=True)
-        data_stat_block(df, 'unfiltered')
-        df = filter_df(df, *(kwargs['filter_ops']))
-        data_stat_block(df, 'filtered')
-    else:
-        data_stat_block(df)
-
-    if 'results_ops' in kwargs:
-        training_results_bar(out_folder=dest_folder, **(kwargs['results_ops']))
-    if 'importance_ops' in kwargs:
-        importance_bars(out_folder=dest_folder, **(kwargs['importance_ops']))
-    if 'qheatmap_ops' in kwargs:
-        quality_heatmap(*(kwargs['qheatmap_ops']), dest_folder)
+# def all_plots(df, dest_folder, **kwargs):
+#
+#     arts_descrs_picture(df, dest_folder, hist_or_bar='bar')
+#
+#     delete_empty_invalid_descriptors(df, df.columns)
+#     kwargs['filter_ops'][2] = np.array(del_from_list_if_not_in_df(df, kwargs['filter_ops'][2]))
+#
+#     def data_stat_block(df, subdir=None):
+#         if subdir is not None:
+#             plot_dir_path = f'{dest_folder}/{subdir}'
+#         else:
+#             plot_dir_path = dest_folder
+#         count_sparsity_plotting_bar(df.loc[:, lists_difference(df.columns, ['PaperID', 'Bad'])], create_bar=True,  # fig 2, S2
+#                                     out_file_path=f'{plot_dir_path}/fig2{EXT}')
+#         descr_sparcity_table(df, df.columns, all_table=True, out_folder=plot_dir_path)
+#
+#     if 'filter_ops' in kwargs:
+#         os.makedirs(f'{dest_folder}/unfiltered/', exist_ok=True)
+#         os.makedirs(f'{dest_folder}/filtered/', exist_ok=True)
+#         data_stat_block(df, 'unfiltered')
+#         df = filter_df(df, *(kwargs['filter_ops']))
+#         data_stat_block(df, 'filtered')
+#     else:
+#         data_stat_block(df)
+#
+#     if 'results_ops' in kwargs:
+#         training_results_bar(out_folder=dest_folder, **(kwargs['results_ops']))
+#     if 'importance_ops' in kwargs:
+#         importance_bars(out_folder=dest_folder, **(kwargs['importance_ops']))
+#     if 'qheatmap_ops' in kwargs:
+#         quality_heatmap(*(kwargs['qheatmap_ops']), dest_folder)
 
 
 def plot_test(out_path):

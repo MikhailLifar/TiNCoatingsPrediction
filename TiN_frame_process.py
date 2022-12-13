@@ -6,32 +6,17 @@ from sklearn.ensemble import ExtraTreesRegressor, ExtraTreesClassifier
 from TiN_utils import *
 
 
-def filter_df(df, delete_names=True, delete_exps=True, good_names=None, good_exps=None):
-    if delete_names:
-        if delete_exps:
-            return df.loc[good_exps, good_names]
-        return df.loc[:, good_names]
-    elif delete_exps:
-        return df.loc[good_exps, :]
-    return df
+def filter_df_per_descr_values_ranges(df, samples_minimum=100, **name_values_pairs):
+    idxs = np.ones(df.shape[1])
+    for name in name_values_pairs:
+        for v in name_values_pairs[name]:
+            if isinstance(v, str) or isinstance(v, int):
+                idxs = idxs & (df[name] == v)
+            elif isinstance(v, tuple):
+                idxs = idxs & (df[name] >= v[0]) & (df[name] <= v[1])
+    assert np.sum(idxs) >= samples_minimum
 
-
-def delete_empty_invalid_descriptors(frame, names):
-    names = clean_list_of_names(frame, names, inplace=False)
-
-    deleted = []
-    for name in names:
-        ind = pd.notnull(frame[name])
-        if (len(np.unique(frame.loc[ind, name])) > 1) and (name[:5] != 'Addit'):
-            dict_ind[name] = list(frame.index[ind])
-        else:
-            del frame[name]
-            deleted.append(name)
-    print(f'Following descriptors were deleted: {deleted}')
-    print(f'Frame shape after deleting empty: {frame.shape}')
-
-    for li in (exp_descr, struct_descr, mech_descr):
-        clean_list_of_names(frame, li)
+    return idxs
 
 
 def find_large_intersect_nominal_descr(df, descrs):
@@ -46,39 +31,7 @@ def find_large_intersect_nominal_descr(df, descrs):
     print(counts)
 
 
-def normalize_frame(df: pd.DataFrame, norm_nominal=False):
-    """
-
-    The function normalises the dataframe
-
-    :param df:
-    :param norm_nominal:
-    :return:
-    """
-    # print(dataframe.dtypes)
-    data_arr = df.to_numpy()
-    columns = df.columns
-    for j in range(data_arr.shape[1]):
-        if (columns[j] not in nominal_descr) or norm_nominal:
-            try:
-                row_arr = data_arr[:, j].astype('float64')
-                row_arr = np.concatenate((row_arr[row_arr < 0], row_arr[row_arr >= 0]))
-                data_arr[:, j] -= np.mean(row_arr)
-                data_arr[:, j] /= np.std(row_arr)
-                dict_norm[columns[j]] = [np.mean(row_arr), np.std(row_arr)]
-            except ValueError:
-                print(columns[j] + ' is not numeric!')
-        else:
-            dict_norm[columns[j]] = [1, 1]
-    for j in range(data_arr.shape[1]):
-        try:
-            df[columns[j]] = data_arr[:, j].astype('float64')
-        except ValueError:
-            print(columns[j] + ' is not continous!')
-    # print(dataframe.dtypes)
-
-
-def recovery_data(df, names_to_recover, additional_names=None, recovery_method='simple', fill_value=0, num_iter=50):
+def recover_dataframe(df, names_to_recover, additional_names=None, recovery_method='simple', fill_value=0, num_iter=50):
     if recovery_method == 'hand_made':
         return df
 
@@ -131,52 +84,10 @@ def recovery_data(df, names_to_recover, additional_names=None, recovery_method='
     return output
 
 
-def recove_and_normalize(frame, target_columns, used_columns=None, recovery_method='simple', fill_value=0, num_iter=50, **key_args):
-    new_frame = recovery_data(frame, target_columns, used_columns, recovery_method, fill_value, num_iter)
-    normalize_frame(new_frame, norm_nominal=key_args['norm_nominal'])
-    return new_frame
-
-
-def apply_one_hot_encoder(df, columns, nan_processor='ignore'):
-    enc = OneHotEncoder()
-    if not isinstance(columns, list):
-        columns = list(columns)
-
-    for name in columns:
-        matr = enc.fit_transform(np.array(df[name]).reshape(-1, 1))
-        matr = matr.toarray()
-        del df[name]
-        if name in exp_descr:
-            exp_descr.remove(name)
-        elif name in struct_descr:
-            struct_descr.remove(name)
-        elif name in mech_descr:
-            mech_descr.remove(name)
-        value_names = enc.categories_[0]
-        length = len(value_names)
-        if isinstance(value_names[-1], float):
-            if nan_processor == 'ignore':
-                length = len(value_names) - 1
-            elif nan_processor == 'add':
-                value_names[-1] = 'NaN'
-        for j in range(length):
-            new_name = name + '_' + value_names[j]
-            df[new_name] = matr[:, j]
-            dict_ind[new_name] = dict_ind[name]
-            exp_descr.append(new_name)
-        del dict_ind[name]
-
-
-def apply_label_encoder(df, columns):
-    if not isinstance(columns, list):
-        columns = list(columns)
-
-    for name in columns:
-        enc = LabelEncoder()
-        name_col = df[name]
-        col = enc.fit_transform(name_col[name_col.notna()].to_numpy())
-        df[name][name_col.notna()] = col
-        dict_labels[name] = enc.classes_
+# def recove_and_normalize(frame, target_columns, used_columns=None, recovery_method='simple', fill_value=0, num_iter=50, **key_args):
+#     new_frame = recover_dataframe(frame, target_columns, used_columns, recovery_method, fill_value, num_iter)
+#     normalize_frame(new_frame, norm_nominal=key_args['norm_nominal'])
+#     return new_frame
 
 
 def generate_df_with_diff_dependencies(frame, main_chance=0.3):
@@ -234,15 +145,3 @@ check_columns = ['CheckSum_N2Press_SubT', 'CheckSum_DeposRate_VoltBias']
 
 best_features = ['PowDensity', 'CathDist', 'ResidPress', 'SubT', 'ChambPress', 'VoltBias', 'N2ArRelation',
                  'Balanc_or_not', 'SubType']
-
-# global dictionaries
-# id of the last column containing data for different files
-dict_last_cols = dict()
-# samples number for different files
-dict_num_exps= dict()
-# lists of idxs of not empty cells for each descriptor
-dict_ind = dict()
-# lists of normalization parameters (mean, std) for each descriptor
-dict_norm = dict()
-# lists of descriptor values replaced by integer labels for nominal descriptors
-dict_labels = dict()

@@ -3,42 +3,29 @@ import numpy as np
 import pandas as pd
 
 
-def clean_list_of_names(df: pd.DataFrame, names: list, inplace=True):
+def del_from_list_if_not_in_df(df: pd.DataFrame, names: list):
     """
     
     The function deletes from list of names
     each name that is not name of dataframe column
-    
-    :param df: 
-    :param names: 
-    :param inplace: 
-    :return: 
+
+    :return: list
     """
 
     columns = df.columns
-    i = 0
-    if inplace:
-        assert isinstance(names, list)
-        while i < len(names):
-            if names[i] not in columns:
-                names.pop(i)
-            else:
-                i += 1
-    else:
-        output = []
-        while i < len(names):
-            if names[i] in columns:
-                output.append(names[i])
-            i += 1
+    output = []
+    for name in names:
+        if name in columns:
+            output.append(name)
 
-        return output
+    return output
 
 
 def del_per_index(li, i):
     return li[:i] + li[i + 1:]
 
 
-def remove_many(li, del_li):
+def lists_difference(li, del_li):
     """
     The function returns list of elements from 1st object
     which are not elements of second object
@@ -161,7 +148,7 @@ def delete_row(dataframe, ind):
     return dataframe.drop(dataframe.index[ind])
 
 
-def get_random_group(num_cols, len_col, type_dependence='no', missing_chance=[], papers=None):
+def get_random_group(num_cols, len_col, type_dependence='no', missing_chance=(), papers=None):
     assert len(papers) == len_col
     if not len(missing_chance):
         missing_chance = np.full(num_cols, 0.5)
