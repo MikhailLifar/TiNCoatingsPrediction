@@ -1,4 +1,5 @@
 # import copy
+# import numpy as np
 
 from TiN_utils import *
 
@@ -19,6 +20,7 @@ class TiN_Dataset:
         for k, v in {'first': 'F', 'descrs': 'C', 'rating': 'E'}.items():
             if k not in columns_to_read:
                 columns_to_read[k] = v
+        self.data_path = path_load_from
         self.df = pd.read_excel(path_load_from, usecols=f'{columns_to_read["first"]}:{columns_to_read["last"]}',
                                 skiprows=skiprows)
         assert self.df.shape[1] == samples_number
@@ -29,8 +31,7 @@ class TiN_Dataset:
         self.descr_rating = pd.read_excel(path_load_from, usecols=columns_to_read["rating"], skiprows=skiprows).to_numpy()[:, 0]
         self.good_samples = np.arange(self.df.shape[0])[self.df['Bad'].isna()]
 
-        self.invalid_descrs = np.zeros_like(self.descr_names, dtype='bool')
-        self._delete_empty_invalid_names()
+        # self.delete_empty_invalid_names()
 
         # self.filtered = False
 
@@ -38,20 +39,21 @@ class TiN_Dataset:
 
         self.dict_labels = self.dict_norm = self.dict_idxs = None
 
-    def _delete_empty_invalid_names(self):
+    def delete_empty_invalid_names(self):
+        invalid_descrs = np.zeros_like(self.descr_names, dtype='bool')
         descr_names_copy = copy.deepcopy(self.descr_names)
 
         for i, name in enumerate(self.descr_names):
             ind = pd.notnull(self.df[name])
             if (len(np.unique(self.df.loc[ind, name])) <= 1) or (name[:5] == 'Addit'):
                 del self.df[name]
-                self.invalid_descrs[i] = 1
+                invalid_descrs[i] = 1
 
-        self.descr_names = self.descr_names[~self.invalid_descrs]
-        self.descr_rating = self.descr_rating[~self.invalid_descrs]
-        self.invalid_descrs = descr_names_copy[self.invalid_descrs]
+        self.descr_names = self.descr_names[~invalid_descrs]
+        self.descr_rating = self.descr_rating[~invalid_descrs]
+        invalid_names = descr_names_copy[invalid_descrs]
 
-        print(f'Following descriptors were deleted: {self.invalid_descrs}')
+        print(f'Following descriptors were deleted: {invalid_names}')
         print(f'Frame shape after deleting empty: {self.df.shape}')
 
     def apply_filter(self, threshold_for_descrs=None, filter_samples=False):
@@ -68,6 +70,21 @@ class TiN_Dataset:
         else:
             return
 
+        self.df.reset_index(drop=True, inplace=True)
+
+    def apply_filter_descr_values_ranges(self, samples_minimum=100, **name_values_pairs):
+        idxs = np.ones(self.df.shape[0])
+        for name, v in name_values_pairs.items():
+            if isinstance(v, str) or isinstance(v, int):
+                idxs = idxs & (self.df[name] == v)
+            elif isinstance(v, tuple):
+                idxs = idxs & (self.df[name] >= v[0]) & (self.df[name] <= v[1])
+        assert np.sum(idxs) >= samples_minimum
+
+        if np.all(idxs):
+            return
+
+        self.df = self.df.loc[idxs, :]
         self.df.reset_index(drop=True, inplace=True)
 
     def get_articles_names(self):
@@ -135,9 +152,17 @@ class TiN_Dataset:
             self.df[name][source_col.notna()] = new_col
             self.dict_labels[name] = enc.classes_
 
-    # def get_descrs_samples_sparsity(self):
-    #     # TODO change functionality outside the class
-    #     missing_mask = self.df.isna().to_numpy()
-    #     missing_counts_descrs = np.sum(missing_mask, axis=0)
-    #     missing_counts_samples = np.sum(missing_mask, axis=1)
-    #     return missing_counts_descrs, missing_counts_samples
+    def get_descrs_samples_sparsity(self, dest_filepath_descrs=None):
+        # TODO change functionality outside the class
+        missing_mask = self.df.isna().to_numpy()
+        missing_counts_descrs = np.sum(missing_mask, axis=0)
+        missing_counts_samples = np.sum(missing_mask, axis=1)
+        if dest_filepath_descrs is not None:
+            with open(dest_filepath_descrs, 'w') as f:
+                f.write(f'file with data path: {self.data_path}\n')
+                f.write('-----SparsityData-----\n')
+                f.write('descriptor;sparsity\n')
+                to_file_col = missing_counts_descrs / self.df.shape[0]
+                for i, s in enumerate(to_file_col):
+                    f.write(f'{self.descr_names[i]};{s}\n')
+        return missing_counts_descrs, missing_counts_samples

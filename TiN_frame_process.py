@@ -128,7 +128,7 @@ exp_descr = ['Method'] + ['CathNum', 'CathType', 'ArcCurr', 'DenArcCurr', 'ArcVo
                                                         'SubSurfStress', 'SubH', 'SubE', 'SubHE', 'SubH3E2', 'SubMu',
                                                         'SubJ', 'SubJk'] + ['Hum', 'IndentMethod'] + ['SubLayer']\
             + ['DeposRate'] + ['TotalFlow', 'N2Flow', 'TargetPow'] + ['Method_1', 'Method_2', 'MagType', 'ResidPress',
-                                                                      'PowDensity', 'IonAtomRatio'] + ['Indent']\
+                                                                      'PowDensity', 'IonAtomRatio'] + ['IndentLoad']\
             + ['FricLoad', 'FricSpeed', 'BallSize', 'BallComp'] + ['React_or_not', 'Balanc_or_not']
 
 struct_descr = ['DenCoat', 'CoatComp', 'CoatCompPercent', 'CoatPhaseComp', 'CoatThick', 'StructType', 'LayerThick',

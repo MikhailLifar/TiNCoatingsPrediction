@@ -202,19 +202,11 @@ def training_results_bar(data_file_path, bar_descrs, out_folder=None, out_file_n
 
 
 # fig4
-def importance_bars(in_path, out_folder, name):
+def importance_bars(in_path, out_folder, name, imputers=('const', 'simple', 'iterative', 'knn')):
     # TODO: this function really depends on external effects, fix it
-    importance_data = pd.read_excel(in_path)
-    flag = False
-    for col in importance_data.columns:
-        if '_' not in col:
-            flag = True
-            del importance_data[col]
-    if flag:
-        importance_data.to_excel(in_path)
-    imp_mass = ['const', 'simple', 'iterative', 'knn']
+    importance_data = pd.read_excel(in_path, index_col='ind')
     columns = importance_data.columns.to_list()
-    for i, imp in enumerate(imp_mass):
+    for i, imp in enumerate(imputers):
         assert columns[2 * i][columns[2 * i].rfind('_') + 1:] == imp
         assert columns[2 * i + 1][columns[2 * i + 1].rfind('_') + 1:] == imp, columns[i][columns[2 * i + 1].rfind('_') + 1:]
         fig, ax = plt.subplots(1, figsize=FIGSIZE_SMALL_TALL)
