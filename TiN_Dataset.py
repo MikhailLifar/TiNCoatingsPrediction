@@ -1,6 +1,3 @@
-# import copy
-# import numpy as np
-
 from TiN_utils import *
 
 from TiN_frame_process import exp_descr, struct_descr, mech_descr, str_descr, nominal_descr

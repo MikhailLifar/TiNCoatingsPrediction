@@ -11,9 +11,6 @@ from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
 from sklearn.gaussian_process import GaussianProcessRegressor, GaussianProcessClassifier
 from sklearn.svm import SVC, SVR
 # from fancyimpute import Solver, NuclearNormMinimization, MatrixFactorization, IterativeSVD, SimpleFill, SoftImpute, BiScaler, KNN, SimilarityWeightedAveraging
-# from datawig import SimpleImputer as DwImputer
-
-from pyfitit import *
 
 from TiN_frame_process import *
 from TiN_plots import *
@@ -301,25 +298,6 @@ def fit_one_target_others_features(dataset: TiN_Dataset, target_names, feature_n
     for name in target_names:
         res[name] = dict_res[name]
     res.T.to_excel(f'{folder}/{filename}')
-
-
-def try_sets_of_1_2_3_4_descrs(dataset: TiN_Dataset, feature_names, target_name, model_typo, sets_flags=(1, 1, 1, 0, 0), cv_parts=5, dest_folder='', **kwargs):
-    assert isinstance(target_name, str), 'parameter target_name should be string'
-    assert kwargs['recovery_method'] != 'iterative', 'Only not iterative for this function'
-    model_regr, model_class = get_regressor_classifier(model_typo)
-    features = feature_names
-    try:
-        features.remove(target_name)
-    except ValueError:
-        print(f'{target_name} not in cols')
-    for i in range(1, len(sets_flags) + 1):
-        if sets_flags[i - 1]:
-            descriptor.descriptor_quality(recover_dataframe(dataset.df.loc[dataset.dict_idxs[target_name], :],
-                                                            feature_names, recovery_method=kwargs['recovery_method'], fill_value=kwargs['fill_value']),
-                                          [target_name], features, model_regr=model_regr, model_class=model_class,
-                                          feature_subset_size=i, cv_repeat=10, cv_parts_count=cv_parts,
-                                          folder=f'{dest_folder}quality_{i}', shuffle=True)
-            print(f'Combinations of {i} descriptors were fitted successfully')
 
 
 def descr_analysis(dataset: TiN_Dataset, columns, dest_folder, number_of_tests=20, model_typo='ExtraTR', imputer_typo='const',
@@ -672,8 +650,8 @@ def run_filtered_Berkovich_only():
 
 
 def main():
-    # run_unfiltered()
-    # run_filtered()
+    run_unfiltered()
+    run_filtered()
 
     # descrs_sparsity_to_file()
 

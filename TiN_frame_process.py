@@ -6,19 +6,6 @@ from sklearn.ensemble import ExtraTreesRegressor, ExtraTreesClassifier
 from TiN_utils import *
 
 
-def filter_df_per_descr_values_ranges(df, samples_minimum=100, **name_values_pairs):
-    idxs = np.ones(df.shape[1])
-    for name in name_values_pairs:
-        for v in name_values_pairs[name]:
-            if isinstance(v, str) or isinstance(v, int):
-                idxs = idxs & (df[name] == v)
-            elif isinstance(v, tuple):
-                idxs = idxs & (df[name] >= v[0]) & (df[name] <= v[1])
-    assert np.sum(idxs) >= samples_minimum
-
-    return idxs
-
-
 def find_large_intersect_nominal_descr(df, descrs):
     li = []
     for i in range(df.shape[0]):

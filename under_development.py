@@ -1,11 +1,10 @@
-import sklearn as skl
-from sklearn.linear_model import RidgeCV, LogisticRegression
+# import sklearn as skl
 
 import pyfitit
 
 # from TiN_utils import *
 from TiN_frame_process import *
-from TiN_Dataset import TiN_Dataset
+# from TiN_Dataset import TiN_Dataset
 
 
 def get_frame_of_ratios(frame, articles, num_rows_per_art=10, mode='ratio'):
@@ -73,6 +72,26 @@ def get_frame_of_ratios(frame, articles, num_rows_per_art=10, mode='ratio'):
         out[out == 0] = np.nan
     out.to_excel('x_file.xlsx')
     return out
+
+
+def try_sets_of_1_2_3_4_descrs(dataset: TiN_Dataset, feature_names, target_name, model_typo, sets_flags=(1, 1, 1, 0, 0), cv_parts=5, dest_folder='', **kwargs):
+    assert isinstance(target_name, str), 'parameter target_name should be string'
+    assert kwargs['recovery_method'] != 'iterative', 'Only not iterative for this function'
+    model_regr, model_class = get_regressor_classifier(model_typo)
+    features = feature_names
+    try:
+        features.remove(target_name)
+    except ValueError:
+        print(f'{target_name} not in cols')
+    for i in range(1, len(sets_flags) + 1):
+        if sets_flags[i - 1]:
+            descriptor.descriptor_quality(recover_dataframe(dataset.df.loc[dataset.dict_idxs[target_name], :],
+                                                            feature_names, recovery_method=kwargs['recovery_method'], fill_value=kwargs['fill_value']),
+                                          [target_name], features, model_regr=model_regr, model_class=model_class,
+                                          feature_subset_size=i, cv_repeat=10, cv_parts_count=cv_parts,
+                                          folder=f'{dest_folder}quality_{i}', shuffle=True)
+            print(f'Combinations of {i} descriptors were fitted successfully')
+
 
 # def data_analysis(frame):
 #     print("You should preset flags for data_analysis")
