@@ -11,9 +11,9 @@ from TiN_frame_process import str_descr, exp_descr
 from pyfitit import plotting
 
 FIGSIZE_MAIN = (16 / 3 * 2, 9 / 3 * 2)  # DON'T CHANGE THIS!
-FIGSIZE_TALL = (16 / 3 * 2, 1.8 * 9 / 3 * 2)
+FIGSIZE_TALL = (16 / 3 * 2, 2. * 9 / 3 * 2)
 FIGSIZE_SMALL_TALL = (16 / 3 * 2, 1.25 * 9 / 3 * 2)
-FIGSIZE_NARROW = (0.5 * 16 / 3 * 2, 1.8 * 9 / 3 * 2)
+FIGSIZE_NARROW = (0.5 * 16 / 3 * 2, 2. * 9 / 3 * 2)
 
 FONTSIZE_MAIN = 15
 FONTSIZE_0 = 22
@@ -326,8 +326,8 @@ def descr_correlate_picture(dataset, used_descr, target_descr, out_folder='', mo
 
 
 # fig S1
-def arts_descrs_picture(frame, out_folder='.', hist_or_bar='hist'):
-    _, counts = np.unique(frame['PaperID'], return_counts=True)
+def arts_descrs_picture(df, out_folder='.', hist_or_bar='hist'):
+    _, counts = np.unique(df['PaperID'], return_counts=True)
     fig, ax = plt.subplots(1, figsize=FIGSIZE_NARROW)
     if hist_or_bar == 'hist':
         _, frequency = np.unique(counts, return_counts=True)
@@ -341,7 +341,8 @@ def arts_descrs_picture(frame, out_folder='.', hist_or_bar='hist'):
         save_csv(unique_counts, frequency, 'counts', 'frequency', f'{out_folder}/arts_descrs_picture.csv')
         ax.bar(unique_counts, frequency, color=(0.8, 0.8, 0.25))
         ax.tick_params(labelsize=FONTSIZE_0)
-        ax.set_xlabel('Number of experiments in article', fontsize=FONTSIZE_0)
+        # ax.set_xlabel('Number of experiments \nin article', fontsize=FONTSIZE_0)
+        ax.set_xlabel('Number of experiments', fontsize=FONTSIZE_0)
         ax.set_ylabel('Number of articles', fontsize=FONTSIZE_0)
     ax.set_yticks(np.arange(np.max(frequency) + 1))
     fig.savefig(f'{out_folder}/arts_descrs_picture{EXT}', dpi=MAIN_DPI, bbox_inches='tight')

@@ -24,6 +24,7 @@ class TiN_Dataset:
         self.descr_names = pd.read_excel(path_load_from, usecols=columns_to_read["descrs"], skiprows=skiprows).to_numpy()[:, 0]
         self.df = self.df.T
         self.df.reset_index(drop=True, inplace=True)
+        print(f'Initial frame shape: {self.df.shape}')
         self.df.columns = self.descr_names
         self.descr_rating = pd.read_excel(path_load_from, usecols=columns_to_read["rating"], skiprows=skiprows).to_numpy()[:, 0]
         self.good_samples = np.arange(self.df.shape[0])[self.df['Bad'].isna()]
@@ -68,6 +69,7 @@ class TiN_Dataset:
             return
 
         self.df.reset_index(drop=True, inplace=True)
+        print(f'Frame shape after filter: {self.df.shape}')
 
     def apply_filter_descr_values_ranges(self, samples_minimum=100, **name_values_pairs):
         idxs = np.ones(self.df.shape[0])
@@ -83,6 +85,8 @@ class TiN_Dataset:
 
         self.df = self.df.loc[idxs, :]
         self.df.reset_index(drop=True, inplace=True)
+
+        print(f'Frame shape after filter per descriptor(s) value(s): {self.df.shape}')
 
     def get_articles_names(self):
         articles, articles_inds = np.unique(self.df['PaperID'], return_index=True)

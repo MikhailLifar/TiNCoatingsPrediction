@@ -18,7 +18,7 @@ def find_large_intersect_nominal_descr(df, descrs):
     print(counts)
 
 
-def recover_dataframe(df, names_to_recover, additional_names=None, recovery_method='simple', fill_value=0, num_iter=50):
+def recover_dataframe(df, names_to_recover, additional_names=None, recovery_method='simple', fill_value=0, num_iter=20):
     if recovery_method == 'hand_made':
         return df
 
@@ -108,8 +108,8 @@ def generate_df_with_diff_dependencies(frame, main_chance=0.3):
 del_names = ['DenArcCurr', 'CathNum', 'CathType']
 
 exp_descr = ['Method'] + ['CathNum', 'CathType', 'ArcCurr', 'DenArcCurr', 'ArcVolt', 'CoilCurr', 'ChambPress',
-                          'N2ChambPress','N2ArRelation', 'DeposTime', 'VoltBias', 'SubT', 'MagnetSep', 'CathDist',
-                          'AngleDepos', 'TargetComp','TargetGeom', 'TargetSize', 'MagnetCurr', 'MagnetVolt(MagnetPow)',
+                          'N2ChambPress', 'N2ArRelation', 'DeposTime', 'VoltBias', 'SubT', 'MagnetSep', 'CathDist',
+                          'AngleDepos', 'TargetComp', 'TargetGeom', 'TargetSize', 'MagnetCurr', 'MagnetVolt(MagnetPow)',
                           'MagnetMat', 'BlockParam'] + ['SubType', 'SubComp', 'SubChar', 'SubStruct', 'SubRough',
                                                         'IonClean', 'IonImplant', 'VoltIonImplant', 'TimeIonImplant',
                                                         'SubSurfStress', 'SubH', 'SubE', 'SubHE', 'SubH3E2', 'SubMu',
